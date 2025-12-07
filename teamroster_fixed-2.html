@@ -506,7 +506,7 @@
                     return true;
                 });
 
-                const pinnedIds = [110,216,215,218,213,307];
+                const pinnedIds = [216,215,218,213,307];
                 const shiftIds = [212,217];
                 const skilledCounts = {};
                 staff.forEach(s => skilledCounts[s.name] = 0);
@@ -572,6 +572,7 @@
                     if (aMorning !== bMorning) return aMorning ? -1 : 1;
                     return 0;
                 }).forEach(t => {
+                    if (t.id === 110) return; // handled separately for per-person allocation
                     if(pinnedIds.includes(t.id) || t.code==='AN') { pinned.push(t); return; }
 
                     const isMorningSet = isMorningTask(t);
@@ -599,6 +600,17 @@
                           assign(target.name, t);
                       }
                   });
+
+                // Allocate Flashfood bags equally across the team (goal: 10 per day)
+                if (staff.length) {
+                    const perPersonBags = (10 / staff.length).toFixed(1).replace(/\.0$/, '');
+                    const flashfoodTask = { id: 'FF-PER', code: 'PS', name: `Flashfood Bags (${perPersonBags} each)`, type: 'general' };
+                    staff.forEach(member => assign(member.name, flashfoodTask));
+                }
+
+                // Assign "Sort throwaways and organix as you go" to every team member
+                const throwawayTask = { id: 'TA-ALL', code: 'PS', name: 'Sort throwaways and organix as you go', type: 'general' };
+                staff.forEach(member => assign(member.name, throwawayTask));
 
                 setTasks(prev => ({...prev, ...newTasks}));
                 setPinnedTasks(pinned);
