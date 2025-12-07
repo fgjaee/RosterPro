@@ -479,7 +479,10 @@
                 const pinned = [];
                 const failed = [];
                 const counts = {};
-                staff.forEach(s => counts[s.name] = 0);
+                staff.forEach(s => {
+                    const existing = tasks[`${selectedDay}-${s.name}`] || [];
+                    counts[s.name] = existing.length;
+                });
                 const assign = (n, t) => {
                     const k = `${selectedDay}-${n}`;
                     if(!newTasks[k]) newTasks[k] = [];
@@ -596,7 +599,13 @@
                               failed.push(t.name + " (No Openers)");
                           }
                       } else {
-                          const target = staff.sort((a,b) => counts[a.name]-counts[b.name])[0];
+                          const target = [...staff].sort((a,b) => {
+                              const diff = counts[a.name]-counts[b.name];
+                              if (diff !== 0) return diff;
+                              const timeA = parseTime(a[selectedDay], a.role).start;
+                              const timeB = parseTime(b[selectedDay], b.role).start;
+                              return timeA - timeB;
+                          })[0];
                           assign(target.name, t);
                       }
                   });
