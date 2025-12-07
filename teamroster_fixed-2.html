@@ -98,14 +98,15 @@
             const [showTaskDBModal, setShowTaskDBModal] = useState(false);
             const [unassignedTasks, setUnassignedTasks] = useState([]);
             const [manualStaff, setManualStaff] = useState([]);
-            
-            const [reassignTask, setReassignTask] = useState(null); 
+
+            const [reassignTask, setReassignTask] = useState(null);
             const [editingRuleId, setEditingRuleId] = useState(null);
             const [newPersonInput, setNewPersonInput] = useState('');
-            
+
             const [showAddStaffModal, setShowAddStaffModal] = useState(false);
             const [newStaffName, setNewStaffName] = useState('');
             const [newStaffShift, setNewStaffShift] = useState('');
+            const [isPrintEditable, setIsPrintEditable] = useState(false);
 
             // --- THE TASK DATABASE (v31 Golden Rules) ---
             const defaultTaskDatabase = [
@@ -375,6 +376,35 @@
                 return [...taskList].sort((a, b) => getPriority(a) - getPriority(b));
             };
 
+            const isMorningTask = (task) => {
+                if (!task || !task.code) return false;
+                return task.code === 'ORD' || task.code.startsWith('T') || task.code.startsWith('W') || task.code === '9AM' || task.timing === 'Due 9am';
+            };
+
+            const extractTaskNumber = (code) => {
+                const match = String(code).match(/\d+/);
+                return match ? parseInt(match[0], 10) : 0;
+            };
+
+            const compareMorningTasks = (a, b) => {
+                const order = ['T', 'W', 'ORD', '9AM'];
+                const getGroup = (code) => {
+                    if (code === 'ORD') return 'ORD';
+                    if (code === '9AM') return '9AM';
+                    return code ? code[0] : '';
+                };
+
+                const groupA = order.indexOf(getGroup(a.code));
+                const groupB = order.indexOf(getGroup(b.code));
+                if (groupA !== groupB) return groupA - groupB;
+
+                const numA = extractTaskNumber(a.code);
+                const numB = extractTaskNumber(b.code);
+                if (numA !== numB) return numA - numB;
+
+                return cleanTaskName(a.name).localeCompare(cleanTaskName(b.name));
+            };
+
             const parseTime = (timeStr, role) => {
                 if (!timeStr || timeStr === 'OFF' || timeStr === 'Manual' || timeStr === 'LOANED OUT') return { start: 24, end: 24, startLabel: 'OFF' };
                 const parts = timeStr.split('-');
@@ -444,15 +474,31 @@
             const autoDistributeTasks = () => {
                 const staff = getDailyStaff();
                 if(!staff.length) return;
-                
+
                 const newTasks = {};
                 const pinned = [];
                 const failed = [];
+                const counts = {};
+                staff.forEach(s => {
+                    const existing = tasks[`${selectedDay}-${s.name}`] || [];
+                    counts[s.name] = existing.length;
+                });
                 const assign = (n, t) => {
                     const k = `${selectedDay}-${n}`;
                     if(!newTasks[k]) newTasks[k] = [];
                     newTasks[k].push(t);
+                    counts[n] = (counts[n] || 0) + 1;
                 };
+
+                const getMorningEligible = (list) => list.filter(s => {
+                        const cat = getShiftCategory(s[selectedDay], s.role);
+                        return cat === 'Open' || cat === 'Overnight';
+                    }).sort((a, b) => {
+                        const timeA = parseTime(a[selectedDay], a.role).start;
+                        const timeB = parseTime(b[selectedDay], b.role).start;
+                        if (timeA !== timeB) return timeA - timeB;
+                        return counts[a.name] - counts[b.name];
+                    });
 
                 const dayMap = {'mon':'Mon','tue':'Tue','wed':'Wed','thu':'Thu','fri':'Fri','sat':'Sat','sun':'Sun'};
                 const d = dayMap[selectedDay];
@@ -463,31 +509,45 @@
                     return true;
                 });
 
-                const pinnedIds = [110,216,215,218,213,307];
+                const pinnedIds = [216,215,218,213,307];
                 const shiftIds = [212,217];
                 const skilledCounts = {};
                 staff.forEach(s => skilledCounts[s.name] = 0);
 
                 let truckUnloaderName = null;
-                validTasks.filter(t => t.type==='skilled' && !pinnedIds.includes(t.id) && !shiftIds.includes(t.id)).forEach(t => {
+                validTasks.filter(t => t.type==='skilled' && !pinnedIds.includes(t.id) && !shiftIds.includes(t.id)).sort((a,b)=>{
+                    const aMorning = isMorningTask(a);
+                    const bMorning = isMorningTask(b);
+                    if (aMorning && bMorning) return compareMorningTasks(a, b);
+                    if (aMorning !== bMorning) return aMorning ? -1 : 1;
+                    return 0;
+                }).forEach(t => {
                     let assigned = false;
-                    const candidates = [];
-                    for(const p of t.fallbackChain) {
-                        const s = staff.find(s => s.name === p);
-                        if (s) candidates.push(s);
+                    if (t.code === 'ORD') {
+                        const openerChain = getMorningEligible(staff.filter(s => t.fallbackChain.includes(s.name)));
+                        if (openerChain.length) {
+                            assign(openerChain[0].name, t);
+                            skilledCounts[openerChain[0].name]++;
+                            assigned = true;
+                        }
                     }
+                    if (!assigned) {
+                        const candidates = [];
+                        for(const p of t.fallbackChain) {
+                            const s = staff.find(s => s.name === p);
+                            if (s) candidates.push(s);
+                        }
 
-                    if (candidates.length > 0) {
-                        candidates.sort((a, b) => {
-                            const countA = (newTasks[`${selectedDay}-${a.name}`] || []).length;
-                            const countB = (newTasks[`${selectedDay}-${b.name}`] || []).length;
-                            return countA - countB;
-                        });
-                        const winner = candidates[0];
-                        assign(winner.name, t);
-                        skilledCounts[winner.name]++;
-                        assigned = true;
-                        if (t.id === 101) truckUnloaderName = winner.name;
+                        if (candidates.length > 0) {
+                            candidates.sort((a, b) => {
+                                return (counts[a.name] || 0) - (counts[b.name] || 0);
+                            });
+                            const winner = candidates[0];
+                            assign(winner.name, t);
+                            skilledCounts[winner.name]++;
+                            assigned = true;
+                            if (t.id === 101) truckUnloaderName = winner.name;
+                        }
                     }
                     if(!assigned) failed.push(t.name);
                 });
@@ -508,39 +568,58 @@
                     });
                 });
 
-                const counts = {};
-                staff.forEach(s => counts[s.name] = (newTasks[`${selectedDay}-${s.name}`]||[]).length);
-                
-                validTasks.filter(t => t.type==='general' || pinnedIds.includes(t.id)).forEach(t => {
+                validTasks.filter(t => t.type==='general' || pinnedIds.includes(t.id)).sort((a,b)=>{
+                    const aMorning = isMorningTask(a);
+                    const bMorning = isMorningTask(b);
+                    if (aMorning && bMorning) return compareMorningTasks(a, b);
+                    if (aMorning !== bMorning) return aMorning ? -1 : 1;
+                    return 0;
+                }).forEach(t => {
+                    if (t.id === 110) return; // handled separately for per-person allocation
                     if(pinnedIds.includes(t.id) || t.code==='AN') { pinned.push(t); return; }
-                    
-                    const isMorningSet = t.code.startsWith('T') || t.code.startsWith('W') || t.code==='9AM' || t.timing === "Due 9am";
+
+                    const isMorningSet = isMorningTask(t);
                     if(isMorningSet) {
                         let openers = staff.filter(s => {
                             const cat = getShiftCategory(s[selectedDay], s.role);
-                            return (cat === 'Open' || cat === 'Overnight') && (skilledCounts[s.name]||0) < 2; 
+                            return cat === 'Open' || cat === 'Overnight';
                         });
                         if(truckUnloaderName && openers.length > 1) openers = openers.filter(s => s.name !== truckUnloaderName);
 
                         if(openers.length) {
                             // Sort by start time first (earliest first), then by task count
-                            openers.sort((a,b) => {
-                                const timeA = parseTime(a[selectedDay], a.role).start;
-                                const timeB = parseTime(b[selectedDay], b.role).start;
-                                if (timeA !== timeB) return timeA - timeB;
-                                return counts[a.name] - counts[b.name];
-                            });
-                            assign(openers[0].name, t);
-                            counts[openers[0].name]++;
-                        } else {
-                            failed.push(t.name + " (No Openers)");
-                        }
-                    } else {
-                        const target = staff.sort((a,b) => counts[a.name]-counts[b.name])[0];
-                        assign(target.name, t);
-                        counts[target.name]++;
-                    }
-                });
+                              openers.sort((a,b) => {
+                                  const timeA = parseTime(a[selectedDay], a.role).start;
+                                  const timeB = parseTime(b[selectedDay], b.role).start;
+                                  if (timeA !== timeB) return timeA - timeB;
+                                  return counts[a.name] - counts[b.name];
+                              });
+                              assign(openers[0].name, t);
+                          } else {
+                              failed.push(t.name + " (No Openers)");
+                          }
+                      } else {
+                          const target = [...staff].sort((a,b) => {
+                              const diff = counts[a.name]-counts[b.name];
+                              if (diff !== 0) return diff;
+                              const timeA = parseTime(a[selectedDay], a.role).start;
+                              const timeB = parseTime(b[selectedDay], b.role).start;
+                              return timeA - timeB;
+                          })[0];
+                          assign(target.name, t);
+                      }
+                  });
+
+                // Allocate Flashfood bags equally across the team (goal: 10 per day)
+                if (staff.length) {
+                    const perPersonBags = (10 / staff.length).toFixed(1).replace(/\.0$/, '');
+                    const flashfoodTask = { id: 'FF-PER', code: 'PS', name: `Flashfood Bags (${perPersonBags} each)`, type: 'general' };
+                    staff.forEach(member => assign(member.name, flashfoodTask));
+                }
+
+                // Assign "Sort throwaways and organix as you go" to every team member
+                const throwawayTask = { id: 'TA-ALL', code: 'PS', name: 'Sort throwaways and organix as you go', type: 'general' };
+                staff.forEach(member => assign(member.name, throwawayTask));
 
                 setTasks(prev => ({...prev, ...newTasks}));
                 setPinnedTasks(pinned);
@@ -629,12 +708,18 @@
                                    <button onClick={handleAddManualStaff} className="p-2 rounded hover:bg-slate-100 text-indigo-600"><UserPlus /></button>
                                    <button onClick={()=>setShowTaskDBModal(true)} className="p-2 rounded hover:bg-slate-100 text-indigo-600"><Database /></button>
                                    <button onClick={autoDistributeTasks} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold flex gap-2"><Wand2 /> Auto</button>
+                                   <button onClick={()=>setIsPrintEditable(p=>!p)} className={`px-4 py-2 rounded text-sm font-bold flex gap-2 ${isPrintEditable ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-slate-100 text-slate-700 border'}`}><Edit3 /> {isPrintEditable ? 'Lock Print' : 'Edit Print'}</button>
                                    <button onClick={handlePrint} className="bg-slate-800 text-white px-4 py-2 rounded text-sm font-bold flex gap-2"><Printer /> Print</button>
                                 </div>
                              </div>
 
                              <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
-                                 {pinnedTasks.length > 0 && (
+                                {isPrintEditable && (
+                                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded">
+                                        Print layout is editable below. Any changes you type will be printed. Click "Lock Print" to hide the preview when you are done editing.
+                                    </div>
+                                )}
+                                {pinnedTasks.length > 0 && (
                                     <div className="mb-6 bg-teal-50 border border-teal-200 rounded-xl p-4">
                                        <h3 className="font-bold text-teal-800 mb-3 flex items-center gap-2"><Pin /> Shared Tasks</h3>
                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -748,7 +833,12 @@
                 </div>
 
                 {/* PRINT LAYOUT - Only visible on print */}
-                <div id="print-root">
+                <div
+                    id="print-root"
+                    contentEditable={isPrintEditable}
+                    suppressContentEditableWarning
+                    style={{ display: isPrintEditable ? 'block' : undefined, outline: isPrintEditable ? '2px dashed #cbd5e1' : 'none', padding: isPrintEditable ? '16px' : undefined }}
+                >
                    <div className="mb-8 text-center border-b-4 border-black pb-4">
                       <h1 className="text-4xl font-black uppercase tracking-widest">MANDATORY TASK LIST</h1>
                       <div className="mt-2 flex justify-center items-center gap-4 text-sm font-bold text-gray-600 uppercase"><span>Compliance Required</span><span>|</span><span>{DAY_LABELS[selectedDay]}</span></div>
