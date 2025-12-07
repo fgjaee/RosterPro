@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartRoster - Production v2.0.1-FIXED</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        @media print {
+            body { visibility: hidden; background: white !important; margin: 0; padding: 0; }
+            #print-root, #print-root * { visibility: visible; }
+            #print-root { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%; 
+                display: block !important;
+            }
+            .no-print { display: none !important; }
+            @page { size: auto; margin: 0.5cm; }
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .hidden { display: none; }
+        #print-root { display: none; } 
+        @media print { #print-root { display: block; } }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- ICONS ---
+        const Icon = ({ children, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {children}
+            </svg>
+        );
+
+        const Camera = () => <Icon><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></Icon>;
+        const Upload = () => <Icon><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>;
+        const CheckCircle = () => <Icon><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>;
+        const Calendar = () => <Icon><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Icon>;
+        const Clock = () => <Icon><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+        const Users = () => <Icon><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
+        const ClipboardList = () => <Icon><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Icon>;
+        const Printer = () => <Icon><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></Icon>;
+        const Wand2 = () => <Icon><path d="M18 2l4 4"/><path d="M10 22l12-12"/><path d="M20 2l-8.5 8.5"/><path d="M15 5l3 3"/><path d="M2 12l5 5"/><path d="M2 22l10-10"/></Icon>;
+        const AlertTriangle = () => <Icon><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Icon>;
+        const AlertOctagon = () => <Icon><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
+        const FileIcon = () => <Icon><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></Icon>;
+        const X = () => <Icon><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
+        const ArrowRight = () => <Icon><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Icon>;
+        const ArrowUp = () => <Icon><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></Icon>;
+        const ArrowDown = () => <Icon><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></Icon>;
+        const Database = () => <Icon><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></Icon>;
+        const Download = () => <Icon><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
+        const FileJson = () => <Icon><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1 1 1 0 0 1-1-1v-1a1 1 0 0 1 1-1"/></Icon>;
+        const Pin = () => <Icon><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></Icon>;
+        const Edit3 = () => <Icon><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></Icon>;
+        const RotateCcw = () => <Icon><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></Icon>;
+        const UserPlus = () => <Icon><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></Icon>;
+        const Trash2 = () => <Icon><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
+        const Plus = () => <Icon><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+
+        const DAY_LABELS = {
+            sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday'
+        };
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('tasks'); 
+            const [uploadState, setUploadState] = useState('idle');
+            const [scheduleData, setScheduleData] = useState(null);
+            const [isEditingSchedule, setIsEditingSchedule] = useState(false); 
+            
+            const [uploadedFile, setUploadedFile] = useState(null);
+            const [previewUrl, setPreviewUrl] = useState(null);
+            const fileInputRef = useRef(null);
+            const dbImportInputRef = useRef(null);
+
+            const [selectedDay, setSelectedDay] = useState('fri'); 
+            const [tasks, setTasks] = useState({}); 
+            const [pinnedTasks, setPinnedTasks] = useState([]); 
+            const [newTaskInput, setNewTaskInput] = useState('');
+            const [activeEmployeeForTask, setActiveEmployeeForTask] = useState(null);
+            const [showTaskDBModal, setShowTaskDBModal] = useState(false);
+            const [unassignedTasks, setUnassignedTasks] = useState([]);
+            const [manualStaff, setManualStaff] = useState([]);
+            
+            const [reassignTask, setReassignTask] = useState(null); 
+            const [editingRuleId, setEditingRuleId] = useState(null);
+            const [newPersonInput, setNewPersonInput] = useState('');
+            
+            const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+            const [newStaffName, setNewStaffName] = useState('');
+            const [newStaffShift, setNewStaffShift] = useState('');
+
+            // --- THE TASK DATABASE (v31 Golden Rules) ---
+            const defaultTaskDatabase = [
+                { id: 101, code: "ON", name: "Truck Unload & Sort", type: "skilled", fallbackChain: ["Essix, Solomon", "Powell, Marlon"] },
+                { id: 112, code: "EOD", name: "Breakdown All Pallets in Cooler/BR", type: "skilled", fallbackChain: ["Essix, Solomon", "Powell, Marlon", "Wood, William B"] },
+                { id: 102, code: "ORD", name: "DOB", type: "skilled", fallbackChain: ["Powell, Marlon", "Mullinix, James", "Nash, Deb A"] },
+                { id: 103, code: "ORD", name: "Freshpak", type: "skilled", fallbackChain: ["Cooley, Sandra K", "Nash, Deb A", "Cannon, Beth M"] },
+                { id: 201, code: "T0", name: "First Impressions Set", type: "general", fallbackChain: ["Wood, William B"] },
+                { id: 204, code: "T1", name: "Tropical/Harvest Set", type: "general", fallbackChain: ["Hernandez, Victoria"] },
+                { id: 203, code: "T2", name: "Apple Set", type: "general", fallbackChain: ["Wood, William B"] },
+                { id: 205, code: "T3", name: "Berries/Grapes Set", type: "general", fallbackChain: ["Hernandez, Victoria"] },
+                { id: 202, code: "T4", name: "Banana/Citrus Set", type: "general", fallbackChain: ["Wood, William B"] },
+                { id: 206, code: "T5", name: "Tomato/Pepper Set", type: "general", fallbackChain: ["Hernandez, Victoria"] },
+                { id: 207, code: "T6", name: "Organic Set", type: "general", fallbackChain: ["Shah, Nabil"] },
+                { id: 208, code: "T7", name: "Potato/Onion Set", type: "general", fallbackChain: ["Shah, Nabil", "Cannon, Beth M"] },
+                { id: 209, code: "G1", name: "Dry Stock/Nuts Set", type: "general", fallbackChain: ["OHare, Barry"] },
+                { id: 104, code: "W1", name: "Freshpak Fruit/Veg Set", type: "skilled", fallbackChain: ["Cooley, Sandra K", "Cannon, Beth M"] },
+                { id: 105, code: "W2", name: "Salad- Juice Set", type: "skilled", fallbackChain: ["Nash, Deb A", "Cooley, Sandra K"] },
+                { id: 106, code: "W3", name: "Mirror Wall Set", type: "skilled", fallbackChain: ["Her, Heidi P", "Finazzo, John S"] },
+                { id: 107, code: "W4", name: "Wet Rack/Herb Set", type: "skilled", fallbackChain: ["Her, Heidi P", "Finazzo, John S"] },
+                { id: 216, code: "9AM", name: "Floor Set By 9am (All)", type: "general", fallbackChain: [] },
+                { id: 215, code: "AN", name: "Sweep & Mop Floor (As Needed)", type: "general", fallbackChain: [] },
+                { id: 218, code: "ON/PS", name: "Backroom Cleanliness", type: "general", fallbackChain: [] },
+                { id: 213, code: "PS", name: "Return Carts Putaway (As Needed)", type: "general", fallbackChain: [] },
+                { id: 110, code: "PS", name: "Flashfood Bags", type: "general", fallbackChain: [] },
+                { id: 307, code: "AN", name: "Signage/Subads (Check Daily)", type: "general", fallbackChain: [] },
+                { id: 212, code: "3X", name: "Roll Bag Refill", type: "shift_based", fallbackChain: [] },
+                { id: 217, code: "3X", name: "Condition/Face Department", type: "shift_based", fallbackChain: [] },
+                { id: 301, code: "MAN", name: "Organix Sorting", type: "skilled", fallbackChain: ["Wood, William B", "Hernandez, Victoria", "Her, Heidi P"] },
+                { id: 302, code: "MAN", name: "Crisping", type: "skilled", fallbackChain: ["Her, Heidi P"] },
+                { id: 303, code: "MAN", name: "IMS Aisle Work", type: "skilled", fallbackChain: ["Shah, Nabil"] },
+                { id: 304, code: "MAN", name: "Hole Scan Entire Department", type: "skilled", fallbackChain: ["Shah, Nabil"] },
+                { id: 305, code: "MAN", name: "Schedule Posting (Fri Only)", type: "skilled", fallbackChain: ["Mullinix, James"] },
+                { id: 306, code: "MAN", name: "Condition Dry/Nuts", type: "skilled", fallbackChain: ["Mullinix, James"] },
+                { id: 308, code: "MAN", name: "Maintain/Upkeep Sales Floor", type: "skilled", fallbackChain: ["OHare, Barry"] },
+                { id: 309, code: "MAN", name: "Close Department", type: "skilled", fallbackChain: ["OHare, Barry"] },
+                { id: 310, code: "MAN", name: "All L-carts folded", type: "skilled", fallbackChain: ["OHare, Barry"] },
+                { id: 311, code: "MAN", name: "Hallway Clean", type: "skilled", fallbackChain: ["OHare, Barry"] },
+                { id: 108, code: "PS", name: "Markdowns (Entire Department)", type: "skilled", fallbackChain: ["Cooley, Sandra K"] },
+                { id: 109, code: "PS", name: "Throwaways/Organix", type: "skilled", fallbackChain: ["Shah, Nabil"] },
+            ];
+
+            const [taskDatabase, setTaskDatabase] = useState(defaultTaskDatabase);
+
+            // Load Task DB
+            useEffect(() => {
+                let savedDB = localStorage.getItem('smartRoster_taskDB_v31_STABLE'); 
+                if (savedDB) {
+                    try { setTaskDatabase(JSON.parse(savedDB)); } catch (e) { console.error("DB Load Error"); }
+                }
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('smartRoster_taskDB_v31_STABLE', JSON.stringify(taskDatabase));
+            }, [taskDatabase]);
+
+            // Load Schedule
+            useEffect(() => {
+                const savedSchedule = localStorage.getItem('smartRoster_scheduleData_v31');
+                if (savedSchedule) {
+                    try { setScheduleData(JSON.parse(savedSchedule)); } catch (e) { console.error("Schedule Load Error"); }
+                } else {
+                     // Default Data if empty - set directly without calling file handler
+                     const initialData = { 
+                        week_period: '11/30 - 12/07 (Manual Verified)', 
+                        shifts: [
+                           { name: 'Beth', role: 'B', sun: '7-3', mon: '7-3', tue: '7-3', wed: '7-3', thu: '7-3', fri: 'OFF', sat: 'OFF' },
+                           { name: 'Nabil', role: 'K', sun: '10-6', mon: '10-6', tue: '10-6', wed: '10-6', thu: '10-6', fri: 'OFF', sat: 'OFF' },
+                           { name: 'John', role: 'M', sun: '6-2', mon: '6-2', tue: '6-2', wed: '6-2', thu: '6-2', fri: 'OFF', sat: 'OFF' },
+                           { name: 'Sarah', role: 'B', sun: '2-10', mon: '2-10', tue: '2-10', wed: '2-10', thu: '2-10', fri: 'OFF', sat: 'OFF' }
+                        ]
+                     };
+                     setScheduleData(initialData);
+                }
+            }, []);
+
+            useEffect(() => {
+                if (scheduleData) {
+                    localStorage.setItem('smartRoster_scheduleData_v31', JSON.stringify(scheduleData));
+                }
+            }, [scheduleData]);
+
+            const confirmSchedule = () => {
+                setUploadState('complete');
+                setActiveTab('tasks');
+            };
+
+            const handleFileSelect = (event) => {
+                const file = event.target.files?.[0];
+                if (!file || !(file instanceof Blob || file instanceof File)) {
+                    console.error('Invalid file object');
+                    return;
+                }
+                
+                setUploadedFile(file);
+                setUploadState('scanning');
+                try {
+                    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                        const url = URL.createObjectURL(file);
+                        setPreviewUrl(url);
+                    } else {
+                        console.warn('URL.createObjectURL not available');
+                        setPreviewUrl(null);
+                    }
+                } catch (error) {
+                    console.error('Error creating preview URL:', error);
+                    setPreviewUrl(null);
+                }
+
+                    setTimeout(() => {
+                        setUploadState('reviewing');
+                        // Corrected Data (Beth 7-3, Nabil 10-6, etc)
+                        const initialData = { 
+                            week_period: '11/30 - 12/07 (Manual Verified)', 
+                            shifts: [
+                                { name: "Cannon, Beth M", role: "Lead", sun: "12:00-8:00", mon: "6:00-2:00", tue: "7:00-3:00", wed: "OFF", thu: "5:00-1:00", fri: "OFF", sat: "7:00-3:00" }, 
+                                { name: "Powell, Marlon", role: "Overnight", sun: "OFF", mon: "OFF", tue: "1:00-9:00", wed: "1:00-9:00", thu: "OFF", fri: "1:00-9:00", sat: "8:00-4:00" },
+                                { name: "Davis, Braylon M", role: "LOANED OUT", sun: "LOANED OUT", mon: "LOANED OUT", tue: "LOANED OUT", wed: "LOANED OUT", thu: "LOANED OUT", fri: "LOANED OUT", sat: "LOANED OUT" },
+                                { name: "Essix, Solomon", role: "Overnight", sun: "11:00-6:00", mon: "OFF", tue: "11:00-6:00", wed: "OFF", thu: "OFF", fri: "11:00-6:00", sat: "11:00-6:00" },
+                                { name: "Nash, Deb A", role: "Stock", sun: "4:00-12:00", mon: "4:00-12:00", tue: "4:00-12:00", wed: "4:00-12:00", thu: "4:00-12:00", fri: "OFF", sat: "OFF" },
+                                { name: "Wood, William B", role: "Stock", sun: "OFF", mon: "5:00-1:00", tue: "5:00-1:00", wed: "5:00-1:00", thu: "OFF", fri: "5:00-1:00", sat: "5:00-1:00" },
+                                { name: "Cooley, Sandra K", role: "Stock", sun: "OFF", mon: "OFF", tue: "4:00-12:00", wed: "4:00-12:00", thu: "4:00-12:00", fri: "4:00-12:00", sat: "4:00-12:00" },
+                                { name: "Andrews, Kenneth", role: "Stock", sun: "OFF", mon: "OFF", tue: "OFF", wed: "OFF", thu: "OFF", fri: "OFF", sat: "OFF" },
+                                { name: "Finazzo, John S", role: "Stock", sun: "7:15-2:00", mon: "OFF", tue: "9:00-2:00", wed: "OFF", thu: "7:15-2:00", fri: "OFF", sat: "OFF" },
+                                { name: "Hernandez, Victoria", role: "Stock", sun: "OFF", mon: "OFF", tue: "OFF", wed: "OFF", thu: "OFF", fri: "6:00-12:00", sat: "OFF" },
+                                { name: "Shah, Nabil", role: "Stock", sun: "10:00-6:00", mon: "OFF", tue: "1:00-9:00", wed: "OFF", thu: "8:00-4:00", fri: "8:00-4:00", sat: "10:00-6:00" },
+                                { name: "Her, Heidi P", role: "Stock", sun: "5:00-12:00", mon: "5:00-12:00", tue: "OFF", wed: "5:00-12:00", thu: "OFF", fri: "5:00-12:00", sat: "5:00-12:00" },
+                                { name: "OHare, Barry", role: "Stock", sun: "OFF", mon: "11:30-7:30", tue: "OFF", wed: "11:30-7:30", thu: "11:30-7:30", fri: "11:30-7:30", sat: "11:30-7:30" },
+                                { name: "Mullinix, James", role: "Supervisor", sun: "5:00-1:00", mon: "5:00-1:00", tue: "1:15-8:00", wed: "2:00-10:00", thu: "OFF", fri: "5:00-1:00", sat: "OFF" }
+                            ]
+                        };
+                        setScheduleData(initialData);
+                    }, 1500);
+            };
+
+            // --- HELPERS ---
+            const handleAddEmployee = () => {
+                if (!scheduleData) return;
+                setScheduleData({ ...scheduleData, shifts: [...scheduleData.shifts, { name: "New", role: "Stock", sun: "OFF", mon: "OFF", tue: "OFF", wed: "OFF", thu: "OFF", fri: "OFF", sat: "OFF" }] });
+            };
+            const handleDeleteEmployee = (i) => {
+                if (!scheduleData) return;
+                setScheduleData({ ...scheduleData, shifts: scheduleData.shifts.filter((_, idx) => idx !== i) });
+            };
+            const handleShiftChange = (i, f, v) => {
+                if (!scheduleData) return;
+                const ns = [...scheduleData.shifts];
+                ns[i] = { ...ns[i], [f]: v };
+                setScheduleData({ ...scheduleData, shifts: ns });
+            };
+            const handleClearSchedule = () => {
+                if(window.confirm("Clear schedule?")) setScheduleData({ week_period: "Manual", shifts: [] });
+            };
+            const handleAddManualStaff = () => {
+                setShowAddStaffModal(true);
+            };
+            const handleRemoveManualStaff = (id) => setManualStaff(prev => prev.filter(s => s.id !== id));
+            const getAllStaffNames = () => scheduleData ? scheduleData.shifts.map(s => s.name).sort() : [];
+            const handleUpdateTaskName = (id, v) => setTaskDatabase(p => p.map(t => t.id===id ? {...t, name: v} : t));
+            const handleUpdateTaskType = (id, v) => setTaskDatabase(p => p.map(t => t.id===id ? {...t, type: v} : t));
+            const handleDeleteRule = (id) => setTaskDatabase(p => p.filter(t => t.id!==id));
+            const handleAddPersonToChain = (id) => {
+                if(!newPersonInput) return;
+                setTaskDatabase(p => p.map(t => t.id===id ? {...t, fallbackChain: [...t.fallbackChain, newPersonInput]} : t));
+                setNewPersonInput('');
+            };
+            const handleRemovePersonFromChain = (id, idx) => {
+                setTaskDatabase(p => p.map(t => t.id===id ? {...t, fallbackChain: t.fallbackChain.filter((_, i) => i!==idx)} : t));
+            };
+            const handleMovePersonInChain = (taskId, idx, direction) => {
+                setTaskDatabase(prev => prev.map(t => {
+                if (t.id === taskId) {
+                    const newChain = [...t.fallbackChain];
+                    if (direction === 'up' && idx > 0) {
+                    [newChain[idx], newChain[idx - 1]] = [newChain[idx - 1], newChain[idx]];
+                    } else if (direction === 'down' && idx < newChain.length - 1) {
+                    [newChain[idx], newChain[idx + 1]] = [newChain[idx + 1], newChain[idx]];
+                    }
+                    return { ...t, fallbackChain: newChain };
+                }
+                return t;
+                }));
+            };
+            const handleAddNewTask = () => {
+                const newId = Math.max(0, ...taskDatabase.map(t => t.id)) + 1;
+                setTaskDatabase([{ id: newId, code: "AN", name: "New General Task", type: "general", fallbackChain: [] }, ...taskDatabase]);
+                setEditingRuleId(newId);
+            };
+            const cleanTaskName = (n) => n.replace(/\(Sat Only\)/gi, '').replace(/\(Wed Only\)/gi, '').replace(/\(Fri Only\)/gi, '').replace(/\(Tue Only\)/gi, '').replace(/\(Excl.*?\)/gi, '').replace(/\(every.*?\)/gi, '').trim();
+            const handlePrint = () => window.print();
+            const handleManualTaskAdd = (name) => {
+                if(!newTaskInput || newTaskInput === '__CUSTOM__') return;
+                const k = `${selectedDay}-${name}`;
+                
+                // Check if this is a task from the database
+                const dbTask = taskDatabase.find(t => t.name === newTaskInput);
+                const taskToAdd = dbTask 
+                    ? { code: dbTask.code, name: dbTask.name, type: dbTask.type, id: dbTask.id }
+                    : { code:'MAN', name: newTaskInput, type:'manual' };
+                
+                setTasks(p => ({...p, [k]: [...(p[k]||[]), taskToAdd]}));
+                setNewTaskInput('');
+                setActiveEmployeeForTask(null);
+            };
+            const handleRemoveTask = (name, idx) => {
+                const k = `${selectedDay}-${name}`;
+                setTasks(p => ({...p, [k]: p[k].filter((_,i)=>i!==idx)}));
+            };
+            const handleBackupAll = () => {
+                const backup = { scheduleData, taskDatabase };
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)], {type:'application/json'}));
+                a.download = 'smartroster_full_backup.json';
+                a.click();
+            };
+            const handleRestoreAll = (e) => {
+                const file = e.target.files[0]; if(!file) return;
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if(data.scheduleData) setScheduleData(data.scheduleData);
+                        if(data.taskDatabase) setTaskDatabase(data.taskDatabase);
+                        alert("Restored!");
+                    } catch(x) { alert("Invalid Backup File"); }
+                };
+                r.readAsText(file);
+            };
+
+            const handleImportClick = () => {
+                dbImportInputRef.current?.click();
+            };
+
+            const handleImportFile = (e) => {
+                const file = e.target.files[0]; if(!file) return;
+                const r = new FileReader();
+                r.onload = (ev) => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        setTaskDatabase(data);
+                        alert("Task Database Imported!");
+                    } catch(x) { alert("Invalid Task Database File"); }
+                };
+                r.readAsText(file);
+            };
+
+            const handleExportDB = () => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([JSON.stringify(taskDatabase,null,2)], {type:'application/json'}));
+                a.download = 'smartroster_taskdb.json';
+                a.click();
+            };
+
+            const sortTasksForDisplay = (taskList) => {
+                if (!taskList) return [];
+                const getPriority = (t) => {
+                    if (t.code.startsWith('T') || t.code.startsWith('W') || t.code === '9AM' || t.code === 'T0') return 1;
+                    if (t.code === 'ORD') return 2;
+                    if (t.code === 'ON') return 3;
+                    if (t.code === 'PS') return 4;
+                    if (t.code === 'EOD') return 5;
+                    if (t.code === 'AN') return 6;
+                    if (t.code === '3X') return 7;
+                    if (t.code === 'MAN') return 99;
+                    return 50;
+                };
+                return [...taskList].sort((a, b) => getPriority(a) - getPriority(b));
+            };
+
+            const parseTime = (timeStr, role) => {
+                if (!timeStr || timeStr === 'OFF' || timeStr === 'Manual' || timeStr === 'LOANED OUT') return { start: 24, end: 24, startLabel: 'OFF' };
+                const parts = timeStr.split('-');
+                if (parts.length < 2) return { start: 24, end: 24, startLabel: timeStr };
+
+                let sRaw = parseInt(parts[0].split(':')[0]);
+                let startH = sRaw;
+                let startSuffix = 'AM';
+
+                if (sRaw === 12) { startH = 12; startSuffix = 'PM'; } 
+                else if (sRaw >= 1 && sRaw <= 6) {
+                    if (role?.toLowerCase().includes('overnight') && sRaw < 4) { startH = sRaw; startSuffix = 'AM'; } 
+                    else if (sRaw >= 3 && sRaw < 12 && !role?.toLowerCase().includes('overnight')) { startH = sRaw; startSuffix = 'AM'; } 
+                    else { startH = sRaw + 12; startSuffix = 'PM'; }
+                } else if (sRaw >= 7 && sRaw <= 11) {
+                    if (role?.toLowerCase().includes('overnight')) { startH = sRaw + 12; startSuffix = 'PM'; } 
+                    else { startH = sRaw; startSuffix = 'AM'; }
+                }
+                if (sRaw >= 4 && sRaw <= 6) { startH = sRaw; startSuffix = 'AM'; }
+
+                return { start: startH, startLabel: `${sRaw}:00 ${startSuffix}` };
+            };
+
+            const getShiftCategory = (timeStr, role) => {
+                const { start } = parseTime(timeStr, role);
+                if (start >= 21 || start < 3) return 'Overnight';
+                if (start >= 3 && start < 9) return 'Open';
+                if (start >= 9 && start < 11) return 'Mid';
+                return 'Close'; 
+            };
+
+            const getDailyStaff = () => {
+                if (!scheduleData) return [];
+                const idx = Object.keys(DAY_LABELS).indexOf(selectedDay);
+                const scheduleStaff = scheduleData.shifts.filter(s => {
+                    const t = s[selectedDay];
+                    if (t && t !== 'OFF' && t !== 'LOANED OUT' && s.role !== 'LOANED OUT') return true;
+                    return false;
+                }).map(s => s);
+                const manuals = manualStaff.filter(s => s.day === selectedDay).map(s => ({
+                    name: s.name, role: s.role, [selectedDay]: s.shift, isManual: true, manualId: s.id
+                }));
+                return [...scheduleStaff, ...manuals];
+            };
+
+            const submitAddStaff = () => {
+                if (!newStaffName) return;
+                setManualStaff(prev => [...prev, { id: Date.now(), name: newStaffName, role: "Manual Add", day: selectedDay, shift: newStaffShift || "Manual" }]);
+                setShowAddStaffModal(false);
+                setNewStaffName('');
+                setNewStaffShift('');
+            };
+
+            const executeReassign = (newEmployeeName) => {
+                if (!reassignTask || !newEmployeeName) return;
+                const { employee, taskIndex, taskData } = reassignTask;
+                const oldKey = `${selectedDay}-${employee}`;
+                const newKey = `${selectedDay}-${newEmployeeName}`;
+                setTasks(prev => ({
+                    ...prev,
+                    [oldKey]: prev[oldKey].filter((_, i) => i !== taskIndex),
+                    [newKey]: [...(prev[newKey] || []), taskData]
+                }));
+                setReassignTask(null);
+            };
+
+            const autoDistributeTasks = () => {
+                const staff = getDailyStaff();
+                if(!staff.length) return;
+                
+                const newTasks = {};
+                const pinned = [];
+                const failed = [];
+                const assign = (n, t) => {
+                    const k = `${selectedDay}-${n}`;
+                    if(!newTasks[k]) newTasks[k] = [];
+                    newTasks[k].push(t);
+                };
+
+                const dayMap = {'mon':'Mon','tue':'Tue','wed':'Wed','thu':'Thu','fri':'Fri','sat':'Sat','sun':'Sun'};
+                const d = dayMap[selectedDay];
+                const validTasks = taskDatabase.filter(t => {
+                    if(t.id === 111 && selectedDay !== 'sat') return false;
+                    if(t.name.includes("Only") && !t.name.includes(d)) return false;
+                    if(t.name.includes(`Excl. ${d}`)) return false;
+                    return true;
+                });
+
+                const pinnedIds = [110,216,215,218,213,307];
+                const shiftIds = [212,217];
+                const skilledCounts = {};
+                staff.forEach(s => skilledCounts[s.name] = 0);
+
+                let truckUnloaderName = null;
+                validTasks.filter(t => t.type==='skilled' && !pinnedIds.includes(t.id) && !shiftIds.includes(t.id)).forEach(t => {
+                    let assigned = false;
+                    const candidates = [];
+                    for(const p of t.fallbackChain) {
+                        const s = staff.find(s => s.name === p);
+                        if (s) candidates.push(s);
+                    }
+
+                    if (candidates.length > 0) {
+                        candidates.sort((a, b) => {
+                            const countA = (newTasks[`${selectedDay}-${a.name}`] || []).length;
+                            const countB = (newTasks[`${selectedDay}-${b.name}`] || []).length;
+                            return countA - countB;
+                        });
+                        const winner = candidates[0];
+                        assign(winner.name, t);
+                        skilledCounts[winner.name]++;
+                        assigned = true;
+                        if (t.id === 101) truckUnloaderName = winner.name;
+                    }
+                    if(!assigned) failed.push(t.name);
+                });
+
+                const byShift = { 'Open':[], 'Mid':[], 'Close':[], 'Overnight':[] };
+                staff.forEach(s => {
+                    const cat = getShiftCategory(s[selectedDay], s.role);
+                    if(cat && byShift[cat]) byShift[cat].push(s);
+                });
+                
+                validTasks.filter(t => shiftIds.includes(t.id)).forEach(t => {
+                    ['Open','Mid','Close'].forEach(cat => {
+                        const list = byShift[cat];
+                        if(list.length) {
+                             list.sort((a, b) => ((newTasks[`${selectedDay}-${a.name}`]||[]).length) - ((newTasks[`${selectedDay}-${b.name}`]||[]).length));
+                             assign(list[0].name, {...t, name: `${t.name} (${cat})`});
+                        }
+                    });
+                });
+
+                const counts = {};
+                staff.forEach(s => counts[s.name] = (newTasks[`${selectedDay}-${s.name}`]||[]).length);
+                
+                validTasks.filter(t => t.type==='general' || pinnedIds.includes(t.id)).forEach(t => {
+                    if(pinnedIds.includes(t.id) || t.code==='AN') { pinned.push(t); return; }
+                    
+                    const isMorningSet = t.code.startsWith('T') || t.code.startsWith('W') || t.code==='9AM' || t.timing === "Due 9am";
+                    if(isMorningSet) {
+                        let openers = staff.filter(s => {
+                            const cat = getShiftCategory(s[selectedDay], s.role);
+                            return (cat === 'Open' || cat === 'Overnight') && (skilledCounts[s.name]||0) < 2; 
+                        });
+                        if(truckUnloaderName && openers.length > 1) openers = openers.filter(s => s.name !== truckUnloaderName);
+
+                        if(openers.length) {
+                            // Sort by start time first (earliest first), then by task count
+                            openers.sort((a,b) => {
+                                const timeA = parseTime(a[selectedDay], a.role).start;
+                                const timeB = parseTime(b[selectedDay], b.role).start;
+                                if (timeA !== timeB) return timeA - timeB;
+                                return counts[a.name] - counts[b.name];
+                            });
+                            assign(openers[0].name, t);
+                            counts[openers[0].name]++;
+                        } else {
+                            failed.push(t.name + " (No Openers)");
+                        }
+                    } else {
+                        const target = staff.sort((a,b) => counts[a.name]-counts[b.name])[0];
+                        assign(target.name, t);
+                        counts[target.name]++;
+                    }
+                });
+
+                setTasks(prev => ({...prev, ...newTasks}));
+                setPinnedTasks(pinned);
+                setUnassignedTasks(failed);
+            };
+
+            const renderShiftTime = (timeStr, role) => {
+                const str = String(timeStr);
+                if (!str || str === 'OFF') return <span className="text-slate-300 text-xs">OFF</span>;
+                if (str === 'Manual') return <span className="text-indigo-600 text-xs font-bold">Manual</span>;
+                if (str === 'LOANED OUT') return <span className="text-amber-600 text-xs font-bold">LOANED</span>;
+                
+                const {startLabel} = parseTime(timeStr, role);
+                return (
+                    <div className="flex flex-col">
+                        <span className="text-slate-700 font-medium text-xs">{str}</span>
+                        <span className="text-[10px] text-slate-400 font-bold">{startLabel} Start</span>
+                    </div>
+                );
+            };
+
+            const getBadgeColor = (code) => {
+                if (!code) return 'bg-slate-100 text-slate-600'; 
+                if (code.includes('ON')) return 'bg-indigo-900 text-indigo-100';
+                if (code.startsWith('T')) return 'bg-green-100 text-green-700 border-green-200';
+                if (code.startsWith('W')) return 'bg-blue-100 text-blue-700 border-blue-200';
+                if (code === 'PS') return 'bg-purple-100 text-purple-700 border-purple-200';
+                if (code === 'EOD') return 'bg-orange-100 text-orange-700 border-orange-200';
+                if (code === 'ORD') return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+                if (code === 'AN') return 'bg-teal-100 text-teal-700 border-teal-200';
+                if (code === '3X') return 'bg-pink-100 text-pink-700 border-pink-200';
+                if (code === 'MAN') return 'bg-gray-100 text-gray-700 border-gray-200';
+                return 'bg-slate-100 text-slate-600';
+            };
+
+            return (
+                <>
+                <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800 no-print">
+                  <nav className="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shrink-0 shadow-sm z-10">
+                    <div className="flex items-center gap-2 text-indigo-600"><CheckCircle /><span className="font-bold text-lg">SmartRoster</span></div>
+                    <div className="flex gap-2 items-center">
+                       <input type="file" ref={dbImportInputRef} onChange={handleRestoreAll} accept=".json" className="hidden"/>
+                       <button onClick={()=>dbImportInputRef.current?.click()} className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-bold border border-slate-200">Restore</button>
+                       <button onClick={handleBackupAll} className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-bold border border-slate-200">Backup</button>
+                       <div className="h-6 w-px bg-slate-300 mx-2"></div>
+                       {['vision','schedule','tasks'].map(t=><button key={t} onClick={()=>setActiveTab(t)} className={`capitalize px-3 py-2 rounded-lg text-sm font-medium ${activeTab===t?'bg-indigo-50 text-indigo-700':'text-slate-500'}`}>{t}</button>)}
+                    </div>
+                  </nav>
+
+                  <main className="flex-1 overflow-hidden relative">
+                     {activeTab === 'vision' && (
+                        <div className="h-full flex flex-col items-center justify-center p-6 bg-slate-50">
+                           <div className="bg-white p-8 rounded-2xl shadow-sm border text-center max-w-md w-full">
+                              <Upload className="mx-auto text-indigo-200 mb-4" />
+                              <h2 className="text-2xl font-bold mb-2">Upload Schedule</h2>
+                              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept="image/*,application/pdf" />
+                              <button onClick={()=>fileInputRef.current?.click()} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-indigo-700 w-full transition-all">Select File</button>
+                           </div>
+                        </div>
+                     )}
+
+                     {activeTab === 'schedule' && scheduleData && (
+                         <div className="h-full overflow-auto p-6">
+                             <div className="bg-white rounded-xl shadow border overflow-hidden">
+                                <div className="p-4 border-b flex justify-between items-center"><h2 className="text-lg font-bold">Weekly Roster</h2>
+                                <div className="flex gap-2">
+                                <button onClick={handleClearSchedule} className="flex gap-1 items-center text-slate-500 px-3 py-1 rounded hover:bg-slate-100"><RotateCcw /> Clear</button>
+                                <button onClick={()=>setIsEditingSchedule(!isEditingSchedule)} className="flex gap-1 items-center bg-indigo-50 text-indigo-700 px-3 py-1 rounded font-bold"><Edit3 /> {isEditingSchedule?'Done':'Edit'}</button>
+                                {!isEditingSchedule&&<button onClick={confirmSchedule} className="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold">Confirm</button>}
+                                </div></div>
+                                <div className="overflow-x-auto">
+                                   <table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3">Name</th><th className="p-3">Role</th>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=><th key={d} className="p-3">{d}</th>)}{isEditingSchedule&&<th className="w-10"></th>}</tr></thead><tbody className="divide-y divide-slate-100">
+                                   {scheduleData.shifts.map((s,i)=><tr key={i}><td className="p-3 font-bold">{isEditingSchedule?<input value={s.name} onChange={e=>handleShiftChange(i,'name',e.target.value)} className="border rounded w-full px-1"/>:s.name}</td><td className="p-3">{isEditingSchedule?<input value={s.role} onChange={e=>handleShiftChange(i,'role',e.target.value)} className="border rounded w-full px-1 text-xs"/>:<span className="text-xs text-slate-500 font-bold uppercase">{s.role}</span>}</td>{['sun','mon','tue','wed','thu','fri','sat'].map(d=><td key={d} className="p-3">{isEditingSchedule?<input value={s[d]} onChange={e=>handleShiftChange(i,d,e.target.value)} className="border rounded w-full px-1 text-center"/>:renderShiftTime(s[d], s.role)}</td>)}{isEditingSchedule&&<td className="p-3"><button onClick={()=>handleDeleteEmployee(i)} className="text-red-500"><Trash2 /></button></td>}</tr>)}
+                                   </tbody></table>
+                                   {isEditingSchedule && <button onClick={handleAddEmployee} className="w-full p-2 text-indigo-600 border-t font-bold text-sm">+ Add Row</button>}
+                                </div>
+                             </div>
+                         </div>
+                     )}
+
+                     {activeTab === 'tasks' && (
+                         <div className="h-full flex flex-col">
+                             <div className="bg-white border-b p-4 flex justify-between items-center shrink-0">
+                                <div className="flex gap-2 overflow-x-auto">{Object.entries(DAY_LABELS).map(([k,l])=><button key={k} onClick={()=>setSelectedDay(k)} className={`px-4 py-2 rounded text-sm font-bold ${selectedDay===k?'bg-indigo-600 text-white':'bg-slate-100'}`}>{l}</button>)}</div>
+                                <div className="flex gap-2">
+                                   <button onClick={handleAddManualStaff} className="p-2 rounded hover:bg-slate-100 text-indigo-600"><UserPlus /></button>
+                                   <button onClick={()=>setShowTaskDBModal(true)} className="p-2 rounded hover:bg-slate-100 text-indigo-600"><Database /></button>
+                                   <button onClick={autoDistributeTasks} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold flex gap-2"><Wand2 /> Auto</button>
+                                   <button onClick={handlePrint} className="bg-slate-800 text-white px-4 py-2 rounded text-sm font-bold flex gap-2"><Printer /> Print</button>
+                                </div>
+                             </div>
+
+                             <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
+                                 {pinnedTasks.length > 0 && (
+                                    <div className="mb-6 bg-teal-50 border border-teal-200 rounded-xl p-4">
+                                       <h3 className="font-bold text-teal-800 mb-3 flex items-center gap-2"><Pin /> Shared Tasks</h3>
+                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          {pinnedTasks.map((t,i)=><div key={i} className="bg-white p-2 rounded border border-teal-100 flex justify-between items-center"><span className="text-sm font-medium flex items-center gap-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${getBadgeColor(t.code)}`}>{t.code}</span>{cleanTaskName(t.name)}</span><div className="text-xs text-slate-400 border-b w-12 text-center">Initials</div></div>)}
+                                       </div>
+                                    </div>
+                                 )}
+                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {getDailyStaff().map((s,idx)=>(
+                                       <div key={idx} className="bg-white rounded-xl shadow-sm border p-4 flex flex-col">
+                                          <div className="flex justify-between mb-4 border-b pb-2">
+                                             <div><h3 className="font-bold">{s.name}</h3><div className="text-xs text-slate-500 flex gap-1"><Clock /> {parseTime(s[selectedDay], s.role).startLabel}</div></div>
+                                             <div className="flex gap-2 items-center">
+                                                <div className="h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">{(tasks[`${selectedDay}-${s.name}`]||[]).length}</div>
+                                                {s.isManual&&<button onClick={()=>handleRemoveManualStaff(s.manualId)} className="text-red-400"><X /></button>}
+                                             </div>
+                                          </div>
+                                          <div className="flex-1 space-y-2 mb-4">
+                                             {sortTasksForDisplay(tasks[`${selectedDay}-${s.name}`]||[]).map((t,i)=>(
+                                                <div key={i} className="flex justify-between p-2 bg-slate-50 rounded border group">
+                                                   <div className="flex items-center gap-2 overflow-hidden"><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${getBadgeColor(t.code)}`}>{t.code}</span><span className="text-sm truncate">{cleanTaskName(t.name)}</span></div>
+                                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                                                       <button onClick={()=>setReassignTask({employee:s.name,taskIndex:i,taskData:t})} className="text-slate-400 hover:text-indigo-600"><ArrowRight /></button>
+                                                       <button onClick={()=>handleRemoveTask(s.name,i)} className="text-slate-400 hover:text-red-500"><Trash2 /></button>
+                                                   </div>
+                                                </div>
+                                             ))}
+                                          </div>
+                                          {activeEmployeeForTask===s.name?(
+                                            <div className="space-y-2">
+                                              <select className="w-full border rounded px-2 py-1 text-sm" value={newTaskInput} onChange={e=>setNewTaskInput(e.target.value)}>
+                                                <option value="">Select a task...</option>
+                                                <option value="__CUSTOM__">Custom Task...</option>
+                                                {taskDatabase.map(t => (
+                                                  <option key={t.id} value={t.name}>{t.code} - {cleanTaskName(t.name)}</option>
+                                                ))}
+                                              </select>
+                                              {newTaskInput === '__CUSTOM__' && (
+                                                <input autoFocus className="w-full border rounded px-2 py-1 text-sm" placeholder="Enter custom task..." onChange={e=>setNewTaskInput(e.target.value)} />
+                                              )}
+                                              <div className="flex gap-2">
+                                                <button onClick={()=>{setActiveEmployeeForTask(null);setNewTaskInput('')}} className="flex-1 text-slate-500 text-xs">Cancel</button>
+                                                <button onClick={()=>handleManualTaskAdd(s.name)} className="flex-1 bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold">Add</button>
+                                              </div>
+                                            </div>
+                                          ):(<button onClick={()=>{setActiveEmployeeForTask(s.name);setNewTaskInput('')}} className="w-full py-2 border border-dashed rounded text-slate-400 text-sm hover:bg-slate-50 flex justify-center gap-1"><Plus /> Add Task</button>)}
+                                       </div>
+                                    ))}
+                                 </div>
+                             </div>
+                         </div>
+                     )}
+
+                     {/* Modals */}
+                     {showAddStaffModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                           <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+                              <h3 className="text-lg font-bold mb-4">Add Staff</h3>
+                              <input className="w-full border p-2 rounded mb-3" placeholder="Name" value={newStaffName} onChange={e=>setNewStaffName(e.target.value)}/>
+                              <input className="w-full border p-2 rounded mb-4" placeholder="Shift" value={newStaffShift} onChange={e=>setNewStaffShift(e.target.value)}/>
+                              <div className="flex justify-end gap-2"><button onClick={()=>setShowAddStaffModal(false)} className="text-slate-500">Cancel</button><button onClick={submitAddStaff} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold">Add</button></div>
+                           </div>
+                        </div>
+                     )}
+                     
+                     {reassignTask && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+                               <h4 className="text-lg font-bold mb-4">Move Task</h4>
+                               <div className="bg-slate-50 p-3 rounded mb-4 border"><div className="text-xs font-bold text-slate-400">Moving:</div><div>{cleanTaskName(reassignTask.taskData.name)}</div></div>
+                               <div className="font-bold text-xs text-slate-500 mb-2">To:</div>
+                               <div className="max-h-48 overflow-y-auto space-y-2 mb-4">
+                                  {getDailyStaff().filter(s=>s.name!==reassignTask.employee).map(s=><button key={s.name} onClick={()=>executeReassign(s.name)} className="w-full text-left px-3 py-2 rounded border hover:bg-indigo-50 text-sm font-medium">{s.name}</button>)}
+                               </div>
+                               <button onClick={()=>setReassignTask(null)} className="w-full py-2 text-slate-500 text-sm hover:bg-slate-100 rounded">Cancel</button>
+                            </div>
+                        </div>
+                     )}
+
+                     {showTaskDBModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                           <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-xl">
+                              <div className="p-4 border-b flex justify-between items-center"><h3 className="text-lg font-bold">Task Database</h3><button onClick={()=>setShowTaskDBModal(false)}><X /></button></div>
+                              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                 {taskDatabase.map(t=>(
+                                    <div key={t.id} className={`border rounded p-4 ${editingRuleId===t.id?'border-indigo-400':'border-slate-200'}`}>
+                                       <div className="flex justify-between mb-2">
+                                          <div className="flex-1"><label className="text-xs font-bold text-slate-400">Task Name</label><input value={t.name} onChange={e=>handleUpdateTaskName(t.id,e.target.value)} onFocus={()=>setEditingRuleId(t.id)} className="w-full font-bold text-slate-700 border-b focus:outline-none"/></div>
+                                          <div className="flex flex-col items-end gap-1">
+                                             <select value={t.type} onChange={e=>handleUpdateTaskType(t.id,e.target.value)} className="text-xs border rounded p-1"><option value="skilled">Skilled</option><option value="general">General</option><option value="shift_based">Shift</option></select>
+                                             <button onClick={()=>handleDeleteRule(t.id)} className="text-red-400"><Trash2 /></button>
+                                          </div>
+                                       </div>
+                                       {t.type==='skilled' && (
+                                          <div className="bg-slate-50 p-2 rounded">
+                                             <div className="flex flex-wrap gap-2 mb-2">{t.fallbackChain.map((p,i)=><div key={i} className="flex items-center bg-white border rounded px-2 py-1 text-xs">{p}<div className="flex flex-col ml-2"><button onClick={()=>handleMovePersonInChain(t.id,i,'up')} disabled={i===0}><ArrowUp /></button><button onClick={()=>handleMovePersonInChain(t.id,i,'down')} disabled={i===t.fallbackChain.length-1}><ArrowDown /></button></div><button onClick={()=>handleRemovePersonFromChain(t.id,i)} className="ml-1 text-red-400"><X /></button></div>)}</div>
+                                             <div className="flex gap-2"><select className="flex-1 border rounded px-2 py-1 text-xs" value={editingRuleId===t.id?newPersonInput:''} onChange={e=>{setEditingRuleId(t.id);setNewPersonInput(e.target.value)}}><option value="">Add Person...</option>{getAllStaffNames().map(n=><option key={n} value={n}>{n}</option>)}</select><button onClick={()=>handleAddPersonToChain(t.id)} className="bg-indigo-100 text-indigo-700 px-2 rounded text-xs font-bold">Add</button></div>
+                                          </div>
+                                       )}
+                                    </div>
+                                 ))}
+                              </div>
+                              <div className="p-4 border-t flex justify-between">
+                                 <div className="flex gap-2"><input type="file" ref={dbImportInputRef} onChange={handleImportFile} accept=".json" className="hidden"/><button onClick={handleImportClick} className="flex gap-1 items-center text-slate-600 text-xs font-bold border rounded px-3 py-2"><FileJson /> Import</button><button onClick={handleExportDB} className="flex gap-1 items-center text-slate-600 text-xs font-bold border rounded px-3 py-2"><Download /> Export</button></div>
+                                 <div className="flex gap-2"><button onClick={handleAddNewTask} className="flex gap-1 text-indigo-600 text-sm font-bold items-center"><Plus /> New</button><button onClick={()=>setShowTaskDBModal(false)} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold text-sm">Close</button></div>
+                              </div>
+                           </div>
+                        </div>
+                     )}
+                  </main>
+                </div>
+
+                {/* PRINT LAYOUT - Only visible on print */}
+                <div id="print-root">
+                   <div className="mb-8 text-center border-b-4 border-black pb-4">
+                      <h1 className="text-4xl font-black uppercase tracking-widest">MANDATORY TASK LIST</h1>
+                      <div className="mt-2 flex justify-center items-center gap-4 text-sm font-bold text-gray-600 uppercase"><span>Compliance Required</span><span>|</span><span>{DAY_LABELS[selectedDay]}</span></div>
+                   </div>
+                   {pinnedTasks.length > 0 && (
+                      <div className="mb-8 border-2 border-black rounded-lg p-4 break-inside-avoid">
+                         <h3 className="text-lg font-bold uppercase mb-4 underline">Shared / As Needed / Safety</h3>
+                         <div className="grid grid-cols-2 gap-x-8 gap-y-2">{pinnedTasks.map((t,i)=><div key={i} className="flex justify-between border-b border-gray-400 pb-1"><span className="font-bold text-sm"><span className="border border-black px-1 mr-2 text-xs">{t.code}</span>{cleanTaskName(t.name)}</span><span className="w-16 border-b border-black"></span></div>)}</div>
+                      </div>
+                   )}
+                   <div className="grid grid-cols-2 gap-8">
+                      {getDailyStaff().map((s, idx) => (
+                         <div key={idx} className="border-2 border-black p-4 rounded-xl break-inside-avoid shadow-sm">
+                            <div className="flex justify-between items-baseline mb-3 border-b-2 border-black pb-2"><h3 className="font-bold text-xl">{s.name}</h3><span className="font-bold">{parseTime(s[selectedDay], s.role).startLabel}</span></div>
+                            <ul className="space-y-2">{sortTasksForDisplay(tasks[`${selectedDay}-${s.name}`]||[]).map((t,i)=><li key={i} className="flex items-start text-sm"><div className="w-4 h-4 border-2 border-black mr-2 shrink-0 mt-0.5"></div><div><span className="font-bold text-xs border border-gray-400 px-1 mr-1">{t.code}</span>{cleanTaskName(t.name)}</div></li>)}</ul>
+                         </div>
+                      ))}
+                   </div>
+                   <div className="mt-12 pt-8 border-t border-gray-300 flex justify-between items-end">
+                      <div><p className="text-sm font-bold uppercase text-gray-500 mb-8">Manager Verification</p><div className="w-64 border-b-2 border-black"></div></div>
+                      <div className="text-right text-xs text-gray-400">Generated by SmartRoster</div>
+                   </div>
+                </div>
+                </>
+            );
+        }
+
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+            
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            
+            componentDidCatch(error, errorInfo) {
+                console.error('Error caught by boundary:', error, errorInfo);
+            }
+            
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div style={{padding: '20px', fontFamily: 'sans-serif'}}>
+                            <h1>Something went wrong</h1>
+                            <pre style={{background: '#f5f5f5', padding: '10px', overflow: 'auto'}}>
+                                {this.state.error && this.state.error.toString()}
+                            </pre>
+                            <button onClick={() => window.location.reload()} style={{marginTop: '10px', padding: '10px 20px'}}>
+                                Reload Page
+                            </button>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        );
+    </script>
+</body>
+</html>
