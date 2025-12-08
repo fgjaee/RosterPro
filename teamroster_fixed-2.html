@@ -8,7 +8,9 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <style>
         @media print {
             body { visibility: hidden; background: white !important; margin: 0; padding: 0; }
@@ -80,10 +82,10 @@
         };
 
         function App() {
-            const [activeTab, setActiveTab] = useState('tasks'); 
+            const [activeTab, setActiveTab] = useState('tasks');
             const [uploadState, setUploadState] = useState('idle');
             const [scheduleData, setScheduleData] = useState(null);
-            const [isEditingSchedule, setIsEditingSchedule] = useState(false); 
+            const [isEditingSchedule, setIsEditingSchedule] = useState(false);
             
             const [uploadedFile, setUploadedFile] = useState(null);
             const [previewUrl, setPreviewUrl] = useState(null);
@@ -107,6 +109,9 @@
             const [newStaffName, setNewStaffName] = useState('');
             const [newStaffShift, setNewStaffShift] = useState('');
             const [isPrintEditable, setIsPrintEditable] = useState(false);
+            const [ocrText, setOcrText] = useState('');
+            const [ocrError, setOcrError] = useState(null);
+            const [ocrProgress, setOcrProgress] = useState(0);
 
             // --- THE TASK DATABASE (v31 Golden Rules) ---
             const defaultTaskDatabase = [
@@ -194,52 +199,124 @@
                 setActiveTab('tasks');
             };
 
-            const handleFileSelect = (event) => {
+            const normalizeTimeLabel = (str) => {
+                if (!str) return 'OFF';
+                const cleaned = str.replace(/\s+/g, '').replace(/–/g, '-');
+                if (/loaned/i.test(cleaned)) return 'LOANED OUT';
+                if (/off/i.test(cleaned)) return 'OFF';
+                const parts = cleaned.split('-');
+                const normalizePiece = (p) => {
+                    let piece = p.toUpperCase();
+                    piece = piece.replace(/([0-9])([AP]M)$/i, '$1$2');
+                    if (/^[0-9]{3,4}$/.test(piece)) piece = piece.replace(/([0-9]{1,2})([0-9]{2})/, '$1:$2');
+                    if (/^[0-9]{1,2}$/.test(piece)) piece = `${piece}:00`;
+                    return piece;
+                };
+                return parts.map(normalizePiece).join('-');
+            };
+
+            const parseScheduleFromText = (text) => {
+                const lines = text.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+                const timeRegex = /(\d{1,2}[:.]?\d{0,2}\s?(?:am|pm)?\s?-\s?\d{1,2}[:.]?\d{0,2}\s?(?:am|pm)?|off|loaned out)/ig;
+                const weekLine = lines.find(l => /\d{1,2}\/\d{1,2}/.test(l)) || 'OCR Import';
+                const dayKeys = ['sun','mon','tue','wed','thu','fri','sat'];
+                const rows = [];
+
+                lines.forEach(line => {
+                    const matches = [...line.matchAll(timeRegex)];
+                    if (matches.length >= 2) {
+                        const times = matches.map(m => normalizeTimeLabel(m[0]));
+                        const namePart = line.slice(0, matches[0].index).replace(/[-•–]+$/, '').trim();
+                        if (!namePart) return;
+                        const roleMatch = namePart.match(/\(([A-Za-z]+)\)$/);
+                        const role = roleMatch ? roleMatch[1] : 'Stock';
+                        const name = roleMatch ? namePart.replace(/\([A-Za-z]+\)$/, '').trim() : namePart;
+                        const row = { name, role };
+                        dayKeys.forEach((k, idx) => row[k] = times[idx] || 'OFF');
+                        rows.push(row);
+                    }
+                });
+
+                if (!rows.length) {
+                    return {
+                        week_period: weekLine,
+                        shifts: [{ name: 'Unknown', role: 'Stock', sun: 'Manual', mon: 'Manual', tue: 'Manual', wed: 'Manual', thu: 'Manual', fri: 'Manual', sat: 'Manual' }]
+                    };
+                }
+
+                return { week_period: weekLine, shifts: rows };
+            };
+
+            const renderPdfToImage = async (file) => {
+                if (!window.pdfjsLib) throw new Error('PDF renderer unavailable');
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                const buffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 2 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: context, viewport }).promise;
+                return canvas.toDataURL('image/png');
+            };
+
+            const performOcr = async (source) => {
+                if (!window.Tesseract) throw new Error('OCR engine unavailable');
+                setOcrProgress(0);
+                const result = await Tesseract.recognize(source, 'eng', {
+                    logger: (message) => {
+                        if (message.status === 'recognizing text' && message.progress !== undefined) {
+                            setOcrProgress(Math.round(message.progress * 100));
+                        }
+                    }
+                });
+                return result.data?.text || '';
+            };
+
+            const handleFileSelect = async (event) => {
                 const file = event.target.files?.[0];
                 if (!file || !(file instanceof Blob || file instanceof File)) {
                     console.error('Invalid file object');
                     return;
                 }
-                
+
                 setUploadedFile(file);
                 setUploadState('scanning');
+                setOcrText('');
+                setOcrError(null);
+
+                let preview = null;
                 try {
                     if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-                        const url = URL.createObjectURL(file);
-                        setPreviewUrl(url);
-                    } else {
-                        console.warn('URL.createObjectURL not available');
-                        setPreviewUrl(null);
+                        preview = URL.createObjectURL(file);
+                        setPreviewUrl(preview);
                     }
                 } catch (error) {
                     console.error('Error creating preview URL:', error);
                     setPreviewUrl(null);
                 }
 
-                    setTimeout(() => {
-                        setUploadState('reviewing');
-                        // Corrected Data (Beth 7-3, Nabil 10-6, etc)
-                        const initialData = { 
-                            week_period: '11/30 - 12/07 (Manual Verified)', 
-                            shifts: [
-                                { name: "Cannon, Beth M", role: "Lead", sun: "12:00-8:00", mon: "6:00-2:00", tue: "7:00-3:00", wed: "OFF", thu: "5:00-1:00", fri: "OFF", sat: "7:00-3:00" }, 
-                                { name: "Powell, Marlon", role: "Overnight", sun: "OFF", mon: "OFF", tue: "1:00-9:00", wed: "1:00-9:00", thu: "OFF", fri: "1:00-9:00", sat: "8:00-4:00" },
-                                { name: "Davis, Braylon M", role: "LOANED OUT", sun: "LOANED OUT", mon: "LOANED OUT", tue: "LOANED OUT", wed: "LOANED OUT", thu: "LOANED OUT", fri: "LOANED OUT", sat: "LOANED OUT" },
-                                { name: "Essix, Solomon", role: "Overnight", sun: "11:00-6:00", mon: "OFF", tue: "11:00-6:00", wed: "OFF", thu: "OFF", fri: "11:00-6:00", sat: "11:00-6:00" },
-                                { name: "Nash, Deb A", role: "Stock", sun: "4:00-12:00", mon: "4:00-12:00", tue: "4:00-12:00", wed: "4:00-12:00", thu: "4:00-12:00", fri: "OFF", sat: "OFF" },
-                                { name: "Wood, William B", role: "Stock", sun: "OFF", mon: "5:00-1:00", tue: "5:00-1:00", wed: "5:00-1:00", thu: "OFF", fri: "5:00-1:00", sat: "5:00-1:00" },
-                                { name: "Cooley, Sandra K", role: "Stock", sun: "OFF", mon: "OFF", tue: "4:00-12:00", wed: "4:00-12:00", thu: "4:00-12:00", fri: "4:00-12:00", sat: "4:00-12:00" },
-                                { name: "Andrews, Kenneth", role: "Stock", sun: "OFF", mon: "OFF", tue: "OFF", wed: "OFF", thu: "OFF", fri: "OFF", sat: "OFF" },
-                                { name: "Finazzo, John S", role: "Stock", sun: "7:15-2:00", mon: "OFF", tue: "9:00-2:00", wed: "OFF", thu: "7:15-2:00", fri: "OFF", sat: "OFF" },
-                                { name: "Hernandez, Victoria", role: "Stock", sun: "OFF", mon: "OFF", tue: "OFF", wed: "OFF", thu: "OFF", fri: "6:00-12:00", sat: "OFF" },
-                                { name: "Shah, Nabil", role: "Stock", sun: "10:00-6:00", mon: "OFF", tue: "1:00-9:00", wed: "OFF", thu: "8:00-4:00", fri: "8:00-4:00", sat: "10:00-6:00" },
-                                { name: "Her, Heidi P", role: "Stock", sun: "5:00-12:00", mon: "5:00-12:00", tue: "OFF", wed: "5:00-12:00", thu: "OFF", fri: "5:00-12:00", sat: "5:00-12:00" },
-                                { name: "OHare, Barry", role: "Stock", sun: "OFF", mon: "11:30-7:30", tue: "OFF", wed: "11:30-7:30", thu: "11:30-7:30", fri: "11:30-7:30", sat: "11:30-7:30" },
-                                { name: "Mullinix, James", role: "Supervisor", sun: "5:00-1:00", mon: "5:00-1:00", tue: "1:15-8:00", wed: "2:00-10:00", thu: "OFF", fri: "5:00-1:00", sat: "OFF" }
-                            ]
-                        };
-                        setScheduleData(initialData);
-                    }, 1500);
+                try {
+                    const imageSource = file.type === 'application/pdf' ? await renderPdfToImage(file) : (preview || await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    }));
+                    if (file.type === 'application/pdf') setPreviewUrl(imageSource);
+                    const text = await performOcr(imageSource);
+                    setOcrText(text.trim());
+                    const parsed = parseScheduleFromText(text);
+                    setScheduleData(parsed);
+                    setUploadState('reviewing');
+                    setActiveTab('schedule');
+                } catch (error) {
+                    console.error('OCR parsing error', error);
+                    setOcrError(error.message || 'Unable to read file');
+                    setUploadState('idle');
+                }
             };
 
             // --- HELPERS ---
@@ -677,7 +754,51 @@
                               <h2 className="text-2xl font-bold mb-2">Upload Schedule</h2>
                               <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept="image/*,application/pdf" />
                               <button onClick={()=>fileInputRef.current?.click()} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow hover:bg-indigo-700 w-full transition-all">Select File</button>
+                              <p className="text-xs text-slate-500 mt-3">Images or PDFs supported. We will OCR and pre-fill your week automatically.</p>
                            </div>
+
+                           {(uploadState !== 'idle' || previewUrl || ocrText || ocrError) && (
+                             <div className="mt-6 grid gap-4 max-w-5xl w-full grid-cols-1 lg:grid-cols-2">
+                                {previewUrl && (
+                                   <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+                                      <div className="px-4 py-3 border-b flex justify-between items-center"><span className="font-bold text-sm">Preview</span><span className="text-xs text-slate-400">{uploadedFile?.name}</span></div>
+                                      <div className="p-4 bg-slate-50 flex items-center justify-center">
+                                         <img src={previewUrl} alt="Upload preview" className="max-h-96 object-contain rounded" />
+                                      </div>
+                                   </div>
+                                )}
+
+                                <div className="bg-white border rounded-2xl shadow-sm p-4 space-y-3">
+                                   <div className="flex items-center justify-between">
+                                      <div>
+                                         <div className="text-xs font-bold text-slate-400">Status</div>
+                                         <div className="text-lg font-bold text-slate-700 capitalize">{uploadState === 'idle' ? 'waiting for upload' : uploadState}</div>
+                                      </div>
+                                      <div className="text-xs text-slate-500">Powered by Tesseract OCR</div>
+                                   </div>
+
+                                   {uploadState === 'scanning' && (
+                                      <div className="space-y-2">
+                                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 transition-all" style={{width: `${ocrProgress}%`}}></div></div>
+                                         <div className="text-xs text-slate-500">Recognizing text... {ocrProgress}%</div>
+                                      </div>
+                                   )}
+
+                                   {ocrError && <div className="text-xs bg-red-50 text-red-700 border border-red-200 rounded p-2">{ocrError}</div>}
+
+                                   {scheduleData && uploadState === 'reviewing' && (
+                                      <div className="text-sm bg-indigo-50 text-indigo-700 border border-indigo-200 rounded p-3">Parsed week: {scheduleData.week_period}. Review and edit under the Schedule tab.</div>
+                                   )}
+
+                                   {ocrText && (
+                                      <div>
+                                         <div className="text-xs font-bold text-slate-400 mb-1">Extracted Text</div>
+                                         <pre className="text-xs bg-slate-50 border rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap">{ocrText}</pre>
+                                      </div>
+                                   )}
+                                </div>
+                             </div>
+                           )}
                         </div>
                      )}
 
