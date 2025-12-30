@@ -110,6 +110,10 @@ export const DEFAULT_TASK_DB: TaskRule[] = [
   { id: 2122, code: "RBAG", name: "Roll Bag Refill (Drive-Time)", type: "shift_based", fallbackChain: [], effort: 10, frequency: 'daily' },
   { id: 309, code: "CLSE", name: "Close Department (Full/Clean)", type: "skilled", fallbackChain: ["OHare, Barry", "Shah, Nabil"], dueTime: 'Closing', effort: 120, frequency: 'daily' },
   { id: 110, code: "FLAS", name: "Flashfood Bags contribution", type: "all_staff", fallbackChain: [], effort: 15, frequency: 'daily' },
+  // --- Universal End-of-Shift Tasks (Last 30 Minutes) ---
+  { id: 111, code: "CLNP", name: "End-of-Shift Cleanup (Work Area & Equipment)", type: "all_staff", fallbackChain: [], dueTime: "Last 30 min", effort: 15, frequency: 'daily' },
+  { id: 112, code: "TRSH", name: "Sort & Process Trash/Cardboard", type: "all_staff", fallbackChain: [], dueTime: "Last 30 min", effort: 10, frequency: 'daily' },
+  { id: 113, code: "THRW", name: "Process Throwaways & Compost", type: "all_staff", fallbackChain: [], dueTime: "Last 30 min", effort: 5, frequency: 'daily' },
   // --- Admin/Management ---
   { id: 307, code: "SIGN", name: "Signage & Subads Check", type: "skilled", fallbackChain: ["Cannon, Beth M", "Mullinix, James"], frequency: 'daily' },
   { id: 305, code: "SCHD", name: "Post Two-Week Schedule", type: "skilled", fallbackChain: ["Mullinix, James", "Cannon, Beth M"], dueTime: "1:00 PM", effort: 30, frequency: 'weekly', frequencyDay: 'fri' },
