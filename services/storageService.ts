@@ -2,13 +2,13 @@
 import { ScheduleData, TaskRule, TaskAssignmentMap, INITIAL_SCHEDULE, Employee } from "../types";
 import { DEFAULT_TASK_DB, DEFAULT_TEAM } from "../constants";
 
-// Updated version keys to force refresh of data structure to v7
-// This ensures the new 'Hardcoded Team' logic takes precedence over old cached dummy data
+// Updated version keys to force refresh of data structure to v8
+// v8: Added universal end-of-shift tasks (CLNP, TRSH, THRW) and fixed PEI scheduling
 const KEYS = {
-  SCHEDULE: 'smartRoster_schedule_v7',
-  TASK_DB: 'smartRoster_taskDB_v7',
-  ASSIGNMENTS: 'smartRoster_assignments_v7',
-  TEAM: 'smartRoster_team_v7',
+  SCHEDULE: 'smartRoster_schedule_v8',
+  TASK_DB: 'smartRoster_taskDB_v8',
+  ASSIGNMENTS: 'smartRoster_assignments_v8',
+  TEAM: 'smartRoster_team_v8',
   PINNED_MSG: 'smartRoster_pinned_msg_v1'
 };
 

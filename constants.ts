@@ -118,7 +118,7 @@ export const DEFAULT_TASK_DB: TaskRule[] = [
   { id: 307, code: "SIGN", name: "Signage & Subads Check", type: "skilled", fallbackChain: ["Cannon, Beth M", "Mullinix, James"], frequency: 'daily' },
   { id: 305, code: "SCHD", name: "Post Two-Week Schedule", type: "skilled", fallbackChain: ["Mullinix, James", "Cannon, Beth M"], dueTime: "1:00 PM", effort: 30, frequency: 'weekly', frequencyDay: 'fri' },
   // --- Monthly Tasks ---
-  { id: 999, code: "PEI", name: "Period End Inventory", type: "skilled", fallbackChain: ["Mullinix, James", "Powell, Marlon"], effort: 480, frequency: 'monthly', frequencyDate: 30 }
+  { id: 999, code: "PEI", name: "Period End Inventory", type: "skilled", fallbackChain: ["Mullinix, James", "Powell, Marlon"], dueTime: "12:00 AM", effort: 480, frequency: 'monthly', frequencyDay: 'tue' }
 ];
 
 export const PRIORITY_PINNED_IDS = [102, 103, 201, 305, 309, 306];

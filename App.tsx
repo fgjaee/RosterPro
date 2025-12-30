@@ -408,7 +408,10 @@ export default function App() {
     const validRules = taskDB.filter(t => {
         if (t.excludedDays && t.excludedDays.includes(selectedDay)) return false;
         if (t.frequency === 'weekly' && (t.frequencyDay || 'fri') !== selectedDay) return false;
-        if (t.frequency === 'monthly' && (t.frequencyDate !== currentSystemDate)) return false;
+        // Monthly with frequencyDay: only show on that specific day of week once per month
+        if (t.frequency === 'monthly' && t.frequencyDay && t.frequencyDay !== selectedDay) return false;
+        // Monthly with frequencyDate: only show on that specific date of month
+        if (t.frequency === 'monthly' && t.frequencyDate && (t.frequencyDate !== currentSystemDate)) return false;
         return true;
     });
 
@@ -443,7 +446,10 @@ export default function App() {
         const validRules = taskDB.filter(t => {
             if (t.excludedDays && t.excludedDays.includes(selectedDay)) return false;
             if (t.frequency === 'weekly' && (t.frequencyDay || 'fri') !== selectedDay) return false;
-            if (t.frequency === 'monthly' && (t.frequencyDate !== currentSystemDate)) return false;
+            // Monthly with frequencyDay: only show on that specific day of week once per month
+            if (t.frequency === 'monthly' && t.frequencyDay && t.frequencyDay !== selectedDay) return false;
+            // Monthly with frequencyDate: only show on that specific date of month
+            if (t.frequency === 'monthly' && t.frequencyDate && (t.frequencyDate !== currentSystemDate)) return false;
             return true;
         }).sort((a, b) => {
             const getRank = (r: TaskRule) => {
