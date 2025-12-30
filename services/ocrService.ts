@@ -44,38 +44,70 @@ export const OCRService = {
      const ai = new GoogleGenAI({ apiKey: getApiKey() });
      const filePart = await fileToGenerativePart(file);
 
-     // Define Prompt with stricter constraints
+     // Define Prompt with enhanced accuracy instructions
      const prompt = `
-        Analyze this roster image. Return a JSON object with:
-        1. 'week_period': The date range found (e.g., "Nov 1 - Nov 7").
-        2. 'shifts': An array of objects for each employee row.
+        You are an expert OCR system for reading employee work schedules. Analyze this schedule image with EXTREME PRECISION.
 
-        Schema for 'shifts':
+        Return a JSON object with:
+        1. 'week_period': The exact date range shown in the header (e.g., "12/07 - 12/13" or "Dec 7 - Dec 13")
+        2. 'shifts': An array of objects for EACH employee row in the exact order they appear
+
+        CRITICAL INSTRUCTIONS FOR ACCURACY:
+
+        EMPLOYEE NAMES:
+        - Read the FULL name EXACTLY as written (Last, First Middle)
+        - DO NOT skip any employees, even if they have all OFF days
+        - Preserve exact spelling, capitalization, and punctuation
+
+        JOB ROLES:
+        - Look for role/title in the "Extra" or secondary column
+        - Common roles: "wr_Lead", "wr_Produce_Overnight", "wr_Produce_Stock", "wr_Supervisor"
+        - If role contains "Lead" -> use "Lead"
+        - If role contains "Overnight" -> use "Produce_Overnight"
+        - If role contains "Supervisor" -> use "Supervisor"
+        - If role contains "Stock" or just "Produce" -> use "Produce_Stock"
+        - If unclear or empty -> use "Stock"
+
+        TIME PARSING RULES (VERY IMPORTANT):
+        - Read times EXACTLY as shown in each cell
+        - Format: "HH:MM(AM/PM)-HH:MM(AM/PM)" (e.g., "10:00AM-6:00AM", "7:15AM-2:00PM")
+        - For times crossing midnight (e.g., "10:00PM-6:00AM"), keep exactly as shown
+        - If cell shows "OFF", blank, empty, "X", "Loan", or similar -> use "OFF"
+        - DO NOT infer or assume times - only use what you can clearly read
+        - Watch for similar-looking characters: "0" vs "O", "1" vs "I", "5" vs "S"
+        - Common patterns: "12:00PM-8:00PM", "6:00AM-2:00PM", "1:00AM-9:00AM"
+
+        MULTI-LINE CELLS:
+        - Some cells may have multiple shifts or additional info (like "Tot: 7.50" or "230 GM Stock/")
+        - ONLY extract the PRIMARY time range (usually the first or most prominent time)
+        - Ignore "Tot:", "GM Stock", "Night_GM_Stock" metadata
+
+        JSON Schema for 'shifts':
         {
-          "name": "Employee Name",
-          "role": "Job Title (or 'Stock' if unclear)",
-          "sun": "Time Range",
-          "mon": "Time Range",
-          "tue": "Time Range",
-          "wed": "Time Range",
-          "thu": "Time Range",
-          "fri": "Time Range",
-          "sat": "Time Range"
+          "name": "Last, First M",
+          "role": "Job_Role",
+          "sun": "HH:MMAM-HH:MMPM or OFF",
+          "mon": "HH:MMAM-HH:MMPM or OFF",
+          "tue": "HH:MMAM-HH:MMPM or OFF",
+          "wed": "HH:MMAM-HH:MMPM or OFF",
+          "thu": "HH:MMAM-HH:MMPM or OFF",
+          "fri": "HH:MMAM-HH:MMPM or OFF",
+          "sat": "HH:MMAM-HH:MMPM or OFF"
         }
 
-        CRITICAL RULES:
-        - **Format Times Strictly**: "HH:MM(AM/PM)-HH:MM(AM/PM)". Example: "7:00AM-3:00PM".
-        - **Inference**: If only numbers appear (e.g., "7-3"), infer AM/PM based on typical retail shifts (7-3 is usually 7am-3pm). If "2-10", it is 2pm-10pm.
-        - **OFF Days**: If a cell is blank, says "OFF", "X", or "Loan", return "OFF".
-        - **Correction**: Treat 'S' as '5', 'O' as '0' if inside a time range.
-        - **Noise**: Ignore text like "Shift", "Hrs", "Meal". Just extract the time.
+        VERIFICATION CHECKLIST:
+        ✓ Did I include ALL employees shown in the table?
+        ✓ Are names spelled EXACTLY as shown?
+        ✓ Did I check each day column carefully for each employee?
+        ✓ Are AM/PM designations correct?
+        ✓ Did I avoid confusing "0" with "O" or "1" with "I"?
 
-        Return ONLY raw JSON. No markdown formatting.
+        Return ONLY the JSON object, no additional text or formatting.
      `;
 
      try {
          const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             contents: {
                 parts: [filePart, { text: prompt }]
             },

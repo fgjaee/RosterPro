@@ -41,31 +41,67 @@ const cleanJsonString = (str: string) => {
 
 export const AIService = {
   // 1. Complex Vision Task: Schedule OCR
-  // Upgraded to gemini-3-pro-preview for maximum accuracy on complex tables
+  // Using gemini-2.0-flash-exp for accurate table parsing
   parseSchedule: async (file: File): Promise<ScheduleData> => {
      const filePart = await fileToGenerativePart(file);
      const prompt = `
-        Analyze this roster image. Return a JSON object with:
-        1. 'week_period': The date range found (e.g., "Nov 1 - Nov 7").
-        2. 'shifts': An array of objects for each employee row.
+        You are an expert OCR system for reading employee work schedules. Analyze this schedule image with EXTREME PRECISION.
 
-        Schema for 'shifts':
+        Return a JSON object with:
+        1. 'week_period': The exact date range shown in the header (e.g., "12/07 - 12/13" or "Dec 7 - Dec 13")
+        2. 'shifts': An array of objects for EACH employee row in the exact order they appear
+
+        CRITICAL INSTRUCTIONS FOR ACCURACY:
+
+        EMPLOYEE NAMES:
+        - Read the FULL name EXACTLY as written (Last, First Middle)
+        - DO NOT skip any employees, even if they have all OFF days
+        - Preserve exact spelling, capitalization, and punctuation
+
+        JOB ROLES:
+        - Look for role/title in the "Extra" or secondary column
+        - Common roles: "wr_Lead", "wr_Produce_Overnight", "wr_Produce_Stock", "wr_Supervisor"
+        - If role contains "Lead" -> use "Lead"
+        - If role contains "Overnight" -> use "Produce_Overnight"
+        - If role contains "Supervisor" -> use "Supervisor"
+        - If role contains "Stock" or just "Produce" -> use "Produce_Stock"
+        - If unclear or empty -> use "Stock"
+
+        TIME PARSING RULES (VERY IMPORTANT):
+        - Read times EXACTLY as shown in each cell
+        - Format: "HH:MM(AM/PM)-HH:MM(AM/PM)" (e.g., "10:00AM-6:00AM", "7:15AM-2:00PM")
+        - For times crossing midnight (e.g., "10:00PM-6:00AM"), keep exactly as shown
+        - If cell shows "OFF", blank, empty, "X", "Loan", or similar -> use "OFF"
+        - DO NOT infer or assume times - only use what you can clearly read
+        - Watch for similar-looking characters: "0" vs "O", "1" vs "I", "5" vs "S"
+        - Common patterns: "12:00PM-8:00PM", "6:00AM-2:00PM", "1:00AM-9:00AM"
+
+        MULTI-LINE CELLS:
+        - Some cells may have multiple shifts or additional info (like "Tot: 7.50" or "230 GM Stock/")
+        - ONLY extract the PRIMARY time range (usually the first or most prominent time)
+        - Ignore "Tot:", "GM Stock", "Night_GM_Stock" metadata
+
+        JSON Schema for 'shifts':
         {
-          "name": "Employee Name",
-          "role": "Job Title (or 'Stock' if unclear)",
-          "sun": "Time Range",
-          "mon": "Time Range",
-          "tue": "Time Range",
-          "wed": "Time Range",
-          "thu": "Time Range",
-          "fri": "Time Range",
-          "sat": "Time Range"
+          "name": "Last, First M",
+          "role": "Job_Role",
+          "sun": "HH:MMAM-HH:MMPM or OFF",
+          "mon": "HH:MMAM-HH:MMPM or OFF",
+          "tue": "HH:MMAM-HH:MMPM or OFF",
+          "wed": "HH:MMAM-HH:MMPM or OFF",
+          "thu": "HH:MMAM-HH:MMPM or OFF",
+          "fri": "HH:MMAM-HH:MMPM or OFF",
+          "sat": "HH:MMAM-HH:MMPM or OFF"
         }
 
-        Rules:
-        - Format Times: "HH:MM(AM/PM)-HH:MM(AM/PM)".
-        - If blank/X/Loan, use "OFF".
-        - Return ONLY JSON.
+        VERIFICATION CHECKLIST:
+        ✓ Did I include ALL employees shown in the table?
+        ✓ Are names spelled EXACTLY as shown?
+        ✓ Did I check each day column carefully for each employee?
+        ✓ Are AM/PM designations correct?
+        ✓ Did I avoid confusing "0" with "O" or "1" with "I"?
+
+        Return ONLY the JSON object, no additional text or formatting.
      `;
 
      try {
