@@ -106,7 +106,7 @@ export const AIService = {
 
      try {
          const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-2.5-flash",
             contents: { parts: [filePart, { text: prompt }] },
             config: { responseMimeType: "application/json" }
          });
@@ -152,7 +152,7 @@ export const AIService = {
 
       try {
           const response = await ai.models.generateContent({
-              model: "gemini-2.0-flash-exp",
+              model: "gemini-2.5-flash",
               contents: { parts: [filePart, { text: prompt }] },
               config: { responseMimeType: "application/json" }
           });
@@ -185,7 +185,7 @@ export const AIService = {
 
       try {
           const response = await ai.models.generateContent({
-              model: "gemini-2.0-flash-exp",
+              model: "gemini-2.5-flash",
               contents: { parts: [{ text: prompt }] },
           });
           return response.text || "Let's have a great shift team!";
