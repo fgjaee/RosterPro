@@ -41,7 +41,7 @@ const cleanJsonString = (str: string) => {
 
 export const AIService = {
   // 1. Complex Vision Task: Schedule OCR
-  // Using gemini-2.0-flash-exp for accurate table parsing
+  // Using Gemini 2.5 Pro for maximum accuracy on complex tables
   parseSchedule: async (file: File): Promise<ScheduleData> => {
      const filePart = await fileToGenerativePart(file);
      const prompt = `
@@ -106,7 +106,7 @@ export const AIService = {
 
      try {
          const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro",
             contents: { parts: [filePart, { text: prompt }] },
             config: { responseMimeType: "application/json" }
          });
