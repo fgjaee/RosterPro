@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix PDF scanning failure on Vercel deployment\n\n- Update environment variable access from process.env to import.meta.env\n- Fix invalid Gemini model names (gemini-3-pro-preview -> gemini-2.0-flash-exp)\n- Add support for both VITE_GEMINI_API_KEY (dev) and GEMINI_API_KEY (prod)\n- Update vite.config.ts to properly expose environment variables\n- Add .env.local documentation for API key configuration\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git config:*)",
+      "Bash(git remote:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(vercel link:*)",
+      "Bash(vercel --prod:*)",
+      "Bash(vercel inspect:*)",
+      "Bash(git commit:*)",
+      "Bash(vercel env:*)",
+      "Bash(printf:*)"
     ]
   }
 }

@@ -670,6 +670,33 @@ export default function App() {
       }
   };
 
+  // Normalize OCR names to match team database using aliases
+  const normalizeEmployeeName = (ocrName: string): string => {
+      if (!ocrName) return ocrName;
+
+      const cleanOCR = ocrName.trim().toLowerCase().replace(/[^a-z\s]/g, '');
+
+      // Try to find a match in the team database using aliases
+      for (const employee of team) {
+          // Check exact match first
+          const cleanTeamName = employee.name.toLowerCase().replace(/[^a-z\s]/g, '');
+          if (cleanTeamName === cleanOCR) return employee.name;
+
+          // Check aliases
+          if (employee.aliases) {
+              for (const alias of employee.aliases) {
+                  const cleanAlias = alias.toLowerCase().replace(/[^a-z\s]/g, '');
+                  if (cleanOCR.includes(cleanAlias) || cleanAlias.includes(cleanOCR)) {
+                      return employee.name;
+                  }
+              }
+          }
+      }
+
+      // No match found, return original
+      return ocrName;
+  };
+
   const handleScanFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -677,7 +704,17 @@ export default function App() {
       setScanStatus('Reading Schedule...');
       try {
           const scannedData = await AIService.parseSchedule(file);
-          setSchedule(scannedData);
+
+          // Normalize employee names using aliases
+          const normalizedData = {
+              ...scannedData,
+              shifts: scannedData.shifts.map(shift => ({
+                  ...shift,
+                  name: normalizeEmployeeName(shift.name)
+              }))
+          };
+
+          setSchedule(normalizedData);
       } catch (error: any) {
           alert("Scan failed: " + error.message);
       } finally {
@@ -1261,12 +1298,36 @@ export default function App() {
                     </div>
                     <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                         {team.map(member => (
-                            <div key={member.id} className="p-4 rounded-xl border-2 border-slate-100 flex justify-between">
-                                <div>
-                                    <input className="font-bold text-slate-800 bg-transparent focus:ring-1 focus:ring-indigo-500 rounded px-1" value={member.name} onChange={e => setTeam(team.map(t => t.id === member.id ? { ...t, name: e.target.value } : t))}/>
-                                    <input className="text-xs text-slate-500 uppercase bg-transparent w-full mt-1 focus:ring-1 focus:ring-indigo-500 rounded px-1" value={member.role} onChange={e => setTeam(team.map(t => t.id === member.id ? { ...t, role: e.target.value } : t))}/>
+                            <div key={member.id} className="p-4 rounded-xl border-2 border-slate-100 flex flex-col gap-2">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                        <input
+                                            className="font-bold text-slate-800 bg-transparent focus:ring-1 focus:ring-indigo-500 rounded px-1 w-full"
+                                            value={member.name}
+                                            onChange={e => setTeam(team.map(t => t.id === member.id ? { ...t, name: e.target.value } : t))}
+                                            placeholder="Full Name"
+                                        />
+                                        <input
+                                            className="text-xs text-slate-500 uppercase bg-transparent w-full mt-1 focus:ring-1 focus:ring-indigo-500 rounded px-1"
+                                            value={member.role}
+                                            onChange={e => setTeam(team.map(t => t.id === member.id ? { ...t, role: e.target.value } : t))}
+                                            placeholder="Role"
+                                        />
+                                    </div>
+                                    <button onClick={() => setTeam(team.filter(t => t.id !== member.id))} className="text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
                                 </div>
-                                <button onClick={() => setTeam(team.filter(t => t.id !== member.id))} className="text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                                <div className="border-t border-slate-100 pt-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">OCR Aliases (comma-separated)</label>
+                                    <input
+                                        className="text-xs text-slate-600 bg-slate-50 border border-slate-200 w-full mt-1 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1"
+                                        value={(member.aliases || []).join(', ')}
+                                        onChange={e => setTeam(team.map(t => t.id === member.id ? {
+                                            ...t,
+                                            aliases: e.target.value.split(',').map(a => a.trim()).filter(a => a.length > 0)
+                                        } : t))}
+                                        placeholder="Ken, Kenneth, K. Andrews"
+                                    />
+                                </div>
                             </div>
                         ))}
                     </div>

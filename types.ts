@@ -22,6 +22,7 @@ export interface Employee {
     isActive: boolean;
     email?: string;
     phone?: string;
+    aliases?: string[]; // OCR name variations (e.g., ["Ken", "Kenneth A", "K. Andrews"])
 }
 
 export interface ScheduleData {

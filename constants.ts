@@ -2,17 +2,17 @@
 import { TaskRule, Employee } from "./types";
 
 export const DEFAULT_TEAM: Employee[] = [
-    { id: '101', name: "Cannon, Beth M", role: "Lead", isActive: true },
-    { id: '102', name: "Powell, Marlon", role: "Overnight", isActive: true },
-    { id: '103', name: "Essix, Solomon", role: "Overnight", isActive: true },
-    { id: '104', name: "Mullinix, James", role: "Supervisor", isActive: true },
-    { id: '105', name: "Wood, William B", role: "Stock", isActive: true },
-    { id: '106', name: "Cooley, Sandra K", role: "Stock", isActive: true },
-    { id: '107', name: "Nash, Deb A", role: "Stock", isActive: true },
-    { id: '108', name: "Shah, Nabil", role: "Stock", isActive: true },
-    { id: '109', name: "Her, Heidi P", role: "Stock", isActive: true },
-    { id: '110', name: "Finazzo, John S", role: "Stock", isActive: true },
-    { id: '111', name: "OHare, Barry", role: "Stock", isActive: true }
+    { id: '101', name: "Cannon, Beth M", role: "Lead", isActive: true, aliases: ["Beth", "Cannon", "Beth C"] },
+    { id: '102', name: "Powell, Marlon", role: "Overnight", isActive: true, aliases: ["Marlon", "Powell"] },
+    { id: '103', name: "Essix, Solomon", role: "Overnight", isActive: true, aliases: ["Solomon", "Essix", "Sol"] },
+    { id: '104', name: "Mullinix, James", role: "Supervisor", isActive: true, aliases: ["James", "Mullinix", "Jim"] },
+    { id: '105', name: "Wood, William B", role: "Stock", isActive: true, aliases: ["William", "Wood", "Will", "Bill"] },
+    { id: '106', name: "Cooley, Sandra K", role: "Stock", isActive: true, aliases: ["Sandra", "Cooley", "Sandy"] },
+    { id: '107', name: "Nash, Deb A", role: "Stock", isActive: true, aliases: ["Deb", "Nash", "Debbie"] },
+    { id: '108', name: "Shah, Nabil", role: "Stock", isActive: true, aliases: ["Nabil", "Shah"] },
+    { id: '109', name: "Her, Heidi P", role: "Stock", isActive: true, aliases: ["Heidi", "Her"] },
+    { id: '110', name: "Finazzo, John S", role: "Stock", isActive: true, aliases: ["John", "Finazzo"] },
+    { id: '111', name: "OHare, Barry", role: "Stock", isActive: true, aliases: ["Barry", "OHare", "O'Hare"] }
 ];
 
 export const COMMON_SHIFTS = [
