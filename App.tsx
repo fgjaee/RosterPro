@@ -1155,7 +1155,7 @@ export default function App() {
 
                 {showTouchScheduler ? (
                     /* Touch Scheduler View - NEW */
-                    <div className="w-full max-w-6xl bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-6">
+                    <div className="w-full max-w-6xl bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-h-[calc(100vh-300px)] overflow-y-auto">
                         <TouchScheduler
                             shifts={schedule.shifts}
                             onUpdateShifts={(updatedShifts) => setSchedule({ ...schedule, shifts: updatedShifts })}
