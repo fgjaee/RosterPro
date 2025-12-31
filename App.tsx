@@ -218,12 +218,16 @@ const PrintableRoster = ({
     staff,
     assignments,
     settings,
-    pinnedMessage
+    pinnedMessage,
+    taskDB,
+    selectedDay
 }: {
     staff: any[],
     assignments: TaskAssignmentMap,
     settings: PrintSettings,
-    pinnedMessage: string
+    pinnedMessage: string,
+    taskDB: TaskRule[],
+    selectedDay: DayKey
 }) => {
     const fontSizeClass = {
         small: 'text-[10px]',
@@ -268,6 +272,48 @@ const PrintableRoster = ({
 
             {settings.layout === 'grid' ? (
                 <div className="grid grid-cols-2 gap-6">
+                    {/* Everybody Card for Print */}
+                    {(() => {
+                        const allStaffTasks = taskDB.filter(t => {
+                            if (t.excludedDays && t.excludedDays.includes(selectedDay)) return false;
+                            if (t.type === 'all_staff') return true;
+                            return false;
+                        });
+
+                        if (allStaffTasks.length === 0) return null;
+
+                        return (
+                            <div className="border-2 border-green-600 rounded-lg break-inside-avoid col-span-2 mb-4">
+                                <div className="bg-green-100 p-2 border-b-2 border-green-600 flex justify-between items-center">
+                                    <span className={`${headerClass} font-bold text-green-900`}>✓ EVERYBODY - Universal Tasks</span>
+                                </div>
+                                <div className="p-3">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {allStaffTasks.sort((a,b) => getTaskSortPriority(a as AssignedTask) - getTaskSortPriority(b as AssignedTask)).map((task) => (
+                                            <div key={task.id} className="border border-green-300 rounded p-2 bg-green-50">
+                                                <div className={`font-bold text-green-900 mb-2 ${fontSizeClass}`}>
+                                                    {cleanTaskName(task.name)}
+                                                    {settings.showTimes && task.dueTime && <span className="ml-2 text-amber-600">({task.dueTime})</span>}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-1">
+                                                    {staff.map(s => {
+                                                        const firstName = s.name.split(',')[0].trim();
+                                                        return (
+                                                            <div key={s.id} className={`flex items-center gap-1 ${fontSizeClass}`}>
+                                                                <span className="w-3 h-3 border-2 border-green-600 rounded inline-block"></span>
+                                                                <span>{firstName}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {staff.map(s => {
                         const tasks = (assignments[`${s.selectedDay}-${s.name}`] || []).sort((a,b) => getTaskSortPriority(a) - getTaskSortPriority(b));
                         return (
@@ -295,6 +341,49 @@ const PrintableRoster = ({
                     })}
                 </div>
             ) : (
+                <>
+                {/* Everybody Card for Print - Table Layout */}
+                {(() => {
+                    const allStaffTasks = taskDB.filter(t => {
+                        if (t.excludedDays && t.excludedDays.includes(selectedDay)) return false;
+                        if (t.type === 'all_staff') return true;
+                        return false;
+                    });
+
+                    if (allStaffTasks.length === 0) return null;
+
+                    return (
+                        <div className="border-2 border-green-600 rounded-lg mb-6 overflow-hidden">
+                            <div className="bg-green-100 p-2 border-b-2 border-green-600">
+                                <span className={`${headerClass} font-bold text-green-900`}>✓ EVERYBODY - Universal Tasks</span>
+                            </div>
+                            <div className="p-3 bg-green-50">
+                                <div className="grid grid-cols-2 gap-4">
+                                    {allStaffTasks.sort((a,b) => getTaskSortPriority(a as AssignedTask) - getTaskSortPriority(b as AssignedTask)).map((task) => (
+                                        <div key={task.id} className="border border-green-300 rounded p-2 bg-white">
+                                            <div className={`font-bold text-green-900 mb-2 ${fontSizeClass}`}>
+                                                {cleanTaskName(task.name)}
+                                                {settings.showTimes && task.dueTime && <span className="ml-2 text-amber-600">({task.dueTime})</span>}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-1">
+                                                {staff.map(s => {
+                                                    const firstName = s.name.split(',')[0].trim();
+                                                    return (
+                                                        <div key={s.id} className={`flex items-center gap-1 ${fontSizeClass}`}>
+                                                            <span className="w-3 h-3 border-2 border-green-600 rounded inline-block"></span>
+                                                            <span>{firstName}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 <table className="w-full border-collapse border border-slate-300">
                     <thead>
                         <tr className="bg-slate-100 text-left">
@@ -328,6 +417,7 @@ const PrintableRoster = ({
                         })}
                     </tbody>
                 </table>
+                </>
             )}
         </div>
     );
@@ -1299,6 +1389,8 @@ export default function App() {
             assignments={assignments}
             settings={printSettings}
             pinnedMessage={pinnedMessage}
+            taskDB={taskDB}
+            selectedDay={selectedDay}
         />
     </div>
     </>
