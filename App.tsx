@@ -297,7 +297,9 @@ const PrintableRoster = ({
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-1">
                                                     {staff.map(s => {
-                                                        const firstName = s.name.split(',')[0].trim();
+                                                        // Format: "Last, First M" -> extract "First"
+                                                        const nameParts = s.name.split(',');
+                                                        const firstName = nameParts.length > 1 ? nameParts[1].trim().split(' ')[0] : s.name.split(' ')[0];
                                                         return (
                                                             <div key={s.id} className={`flex items-center gap-1 ${fontSizeClass}`}>
                                                                 <span className="w-3 h-3 border-2 border-green-600 rounded inline-block"></span>
@@ -367,7 +369,9 @@ const PrintableRoster = ({
                                             </div>
                                             <div className="grid grid-cols-2 gap-1">
                                                 {staff.map(s => {
-                                                    const firstName = s.name.split(',')[0].trim();
+                                                    // Format: "Last, First M" -> extract "First"
+                                                    const nameParts = s.name.split(',');
+                                                    const firstName = nameParts.length > 1 ? nameParts[1].trim().split(' ')[0] : s.name.split(' ')[0];
                                                     return (
                                                         <div key={s.id} className={`flex items-center gap-1 ${fontSizeClass}`}>
                                                             <span className="w-3 h-3 border-2 border-green-600 rounded inline-block"></span>
@@ -1045,7 +1049,9 @@ export default function App() {
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-1 mt-2 pt-2 border-t border-green-100">
                                                         {dailyStaff.map((s, idx) => {
-                                                            const firstName = s.name.split(',')[0].trim();
+                                                            // Format: "Last, First M" -> extract "First"
+                                                            const nameParts = s.name.split(',');
+                                                            const firstName = nameParts.length > 1 ? nameParts[1].trim().split(' ')[0] : s.name.split(' ')[0];
                                                             return (
                                                                 <div key={s.id} className="flex items-center gap-1.5 text-xs text-slate-700 hover:bg-green-50 px-1.5 py-1 rounded">
                                                                     <input type="checkbox" className="rounded border-green-300 text-green-600 focus:ring-green-500 shrink-0" />
