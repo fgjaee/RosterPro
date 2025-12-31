@@ -538,33 +538,8 @@ export default function App() {
             }
         }
 
-        // ALL_STAFF TASKS: Assign to everyone with personalized times
-        const allStaffTasks = validRules.filter(t => t.type === 'all_staff');
-        allStaffTasks.forEach(task => {
-            if (task.code === 'FLAS') {
-                // Special handling for Flashfood - split bags among staff
-                const bagsTotal = 10;
-                const bagsPerPerson = Math.ceil(bagsTotal / staff.length);
-                staff.forEach(s => {
-                    const personalizedTask = { ...task, name: `${bagsPerPerson} Flashfood Bags` };
-                    // If task has "Last 30 min" dueTime, calculate actual time based on employee's shift
-                    if (task.dueTime === "Last 30 min" && s.compEnd && s.compEnd > 0) {
-                        personalizedTask.dueTime = formatEndOfShiftTime(s.compEnd);
-                    }
-                    assign(s.name, personalizedTask);
-                });
-            } else {
-                // All other all_staff tasks - personalize dueTime for each employee
-                staff.forEach(s => {
-                    const personalizedTask = { ...task };
-                    // If task has "Last 30 min" dueTime, calculate actual time based on employee's shift
-                    if (task.dueTime === "Last 30 min" && s.compEnd && s.compEnd > 0) {
-                        personalizedTask.dueTime = formatEndOfShiftTime(s.compEnd);
-                    }
-                    assign(s.name, personalizedTask);
-                });
-            }
-        });
+        // ALL_STAFF TASKS: These are now handled in a separate "Everybody" card
+        // No longer assigned to individual staff members
 
         validRules.filter(t => t.type === 'skilled' && t.code !== 'TRCK').forEach(t => {
             let assigned = false;
@@ -904,6 +879,59 @@ export default function App() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Everybody Card - Universal Tasks */}
+                        {(() => {
+                            const allStaffTasks = taskDB.filter(t => {
+                                if (t.excludedDays && t.excludedDays.includes(selectedDay)) return false;
+                                if (t.type === 'all_staff') return true;
+                                return false;
+                            });
+
+                            if (allStaffTasks.length === 0) return null;
+
+                            const dailyStaff = getDailyStaff();
+
+                            return (
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-md border-2 border-green-300 overflow-hidden break-inside-avoid">
+                                    <div className="p-4 border-b border-green-200 bg-green-100/50 flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <UserCheck className="text-green-700" size={20}/>
+                                            <h3 className="font-bold text-lg text-green-900 leading-none">Everybody</h3>
+                                        </div>
+                                        <span className="text-[10px] font-black bg-green-700 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Universal Tasks</span>
+                                    </div>
+                                    <div className="p-2 min-h-[120px]">
+                                        <ul className="space-y-2">
+                                            {allStaffTasks.sort((a,b) => getTaskSortPriority(a as AssignedTask) - getTaskSortPriority(b as AssignedTask)).map((task) => (
+                                                <li key={task.id} className="bg-white rounded border border-green-200 p-3">
+                                                    <div className="flex items-start gap-2 mb-2">
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getBadgeColor(task.code)}`}>{task.code}</span>
+                                                        <div className="flex-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <span className="text-sm font-bold text-green-900">{cleanTaskName(task.name)}</span>
+                                                                {task.dueTime && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 rounded ml-2 whitespace-nowrap">{task.dueTime}</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-1 mt-2 pt-2 border-t border-green-100">
+                                                        {dailyStaff.map(s => {
+                                                            const firstName = s.name.split(',')[0].trim();
+                                                            return (
+                                                                <label key={s.id} className="flex items-center gap-1.5 text-xs text-slate-700 hover:bg-green-50 px-1.5 py-1 rounded cursor-pointer">
+                                                                    <input type="checkbox" className="rounded border-green-300 text-green-600 focus:ring-green-500" />
+                                                                    <span className="font-medium">{firstName}</span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {getDailyStaff().map(staff => {
                             const tasks = (assignments[`${selectedDay}-${staff.name}`] || []).sort((a,b) => getTaskSortPriority(a) - getTaskSortPriority(b));
