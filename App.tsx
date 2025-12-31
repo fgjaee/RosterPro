@@ -28,6 +28,7 @@ const getDueTimeValue = (t: string | undefined) => {
     if (!t) return 9999;
     if (t === "Store Open") return 700;
     if (t === "Closing") return 2200;
+    if (t === "Last 30 min") return 9998;
     const norm = t.toUpperCase().replace(/\s+/g, ' ').trim();
     const match = norm.match(/(\d{1,2})(?::(\d{2}))?\s*(A|P|AM|PM)?/);
     if (match) {
@@ -40,6 +41,37 @@ const getDueTimeValue = (t: string | undefined) => {
         return h * 100 + m;
     }
     return 9999;
+};
+
+const getTaskSortPriority = (task: AssignedTask) => {
+    // Priority 1: Stocking tasks (Tables and Walls) - These come FIRST
+    if (task.code.startsWith('T') || task.code.startsWith('W')) {
+        const num = parseInt(task.code.slice(1) || '0');
+        return 1000 + num; // T0=1000, T1=1001, ..., W1=1001, W2=1002, etc
+    }
+
+    // Priority 2: Critical skilled tasks (TRCK, ORDR, FACE)
+    if (task.code === 'TRCK') return 2000;
+    if (task.code === 'ORDR') return 2001;
+    if (task.code === 'FACE') return 2002;
+
+    // Priority 3: Other skilled/general tasks - Middle priority by due time
+    if (task.type === 'skilled' || task.type === 'general' || task.type === 'shift_based') {
+        return 3000 + getDueTimeValue(task.dueTime);
+    }
+
+    // Priority 4: Universal end-of-shift tasks - These come LAST
+    if (task.type === 'all_staff' || ['FLAS', 'CLNP', 'TRSH', 'THRW'].includes(task.code)) {
+        // Sort these by specific order: FLAS first, then cleanup tasks
+        if (task.code === 'FLAS') return 9000;
+        if (task.code === 'CLNP') return 9001;
+        if (task.code === 'TRSH') return 9002;
+        if (task.code === 'THRW') return 9003;
+        return 9100; // Other all_staff tasks
+    }
+
+    // Default: Sort by due time
+    return 5000 + getDueTimeValue(task.dueTime);
 };
 
 const parseShiftStartEnd = (timeStr: string) => {
@@ -205,7 +237,7 @@ const PrintableRoster = ({
             {settings.layout === 'grid' ? (
                 <div className="grid grid-cols-2 gap-6">
                     {staff.map(s => {
-                        const tasks = (assignments[`${s.selectedDay}-${s.name}`] || []).sort((a,b) => getDueTimeValue(a.dueTime) - getDueTimeValue(b.dueTime));
+                        const tasks = (assignments[`${s.selectedDay}-${s.name}`] || []).sort((a,b) => getTaskSortPriority(a) - getTaskSortPriority(b));
                         return (
                             <div key={s.id} className="border border-slate-300 rounded-lg break-inside-avoid">
                                 <div className="bg-slate-100 p-2 border-b border-slate-300 flex justify-between items-center">
@@ -241,7 +273,7 @@ const PrintableRoster = ({
                     </thead>
                     <tbody>
                          {staff.map(s => {
-                            const tasks = (assignments[`${s.selectedDay}-${s.name}`] || []).sort((a,b) => getDueTimeValue(a.dueTime) - getDueTimeValue(b.dueTime));
+                            const tasks = (assignments[`${s.selectedDay}-${s.name}`] || []).sort((a,b) => getTaskSortPriority(a) - getTaskSortPriority(b));
                             return (
                                 <tr key={s.id} className="break-inside-avoid">
                                     <td className={`p-2 border border-slate-300 font-bold align-top ${headerClass}`}>{s.name}</td>
@@ -803,7 +835,7 @@ export default function App() {
                                         </div>
                                     ) : (
                                         <ul className="space-y-1">
-                                            {unassignedTasks.sort((a,b) => getDueTimeValue(a.dueTime) - getDueTimeValue(b.dueTime)).map((t) => (
+                                            {unassignedTasks.sort((a,b) => getTaskSortPriority(a as AssignedTask) - getTaskSortPriority(b as AssignedTask)).map((t) => (
                                                 <li key={t.id} className="group flex items-start p-2 rounded bg-white border border-indigo-100 hover:border-indigo-400 shadow-sm transition-all">
                                                     <div className="mr-2 mt-0.5"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getBadgeColor(t.code)}`}>{t.code}</span></div>
                                                     <div className="flex-1">
@@ -828,7 +860,7 @@ export default function App() {
                         )}
 
                         {getDailyStaff().map(staff => {
-                            const tasks = (assignments[`${selectedDay}-${staff.name}`] || []).sort((a,b) => getDueTimeValue(a.dueTime) - getDueTimeValue(b.dueTime));
+                            const tasks = (assignments[`${selectedDay}-${staff.name}`] || []).sort((a,b) => getTaskSortPriority(a) - getTaskSortPriority(b));
                             const { label, category } = parseTime(staff.activeTime, staff.role, staff.isSpillover);
                             const hours = (getWorkerLoad(staff.name, assignments) / 60).toFixed(1);
                             return (
