@@ -560,6 +560,8 @@ export default function App() {
   const unassignedTasks = useMemo(() => {
     const currentSystemDate = new Date().getDate();
     const validRules = taskDB.filter(t => {
+        // Exclude all_staff tasks - they go in the "Everybody" card
+        if (t.type === 'all_staff') return false;
         if (t.excludedDays && t.excludedDays.includes(selectedDay)) return false;
         if (t.frequency === 'weekly' && (t.frequencyDay || 'fri') !== selectedDay) return false;
         // Monthly with frequencyDay: only show on that specific day of week once per month
@@ -1005,13 +1007,18 @@ export default function App() {
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-1 mt-2 pt-2 border-t border-green-100">
-                                                        {dailyStaff.map(s => {
+                                                        {dailyStaff.map((s, idx) => {
                                                             const firstName = s.name.split(',')[0].trim();
                                                             return (
-                                                                <label key={s.id} className="flex items-center gap-1.5 text-xs text-slate-700 hover:bg-green-50 px-1.5 py-1 rounded cursor-pointer">
-                                                                    <input type="checkbox" className="rounded border-green-300 text-green-600 focus:ring-green-500" />
-                                                                    <span className="font-medium">{firstName}</span>
-                                                                </label>
+                                                                <div key={s.id} className="flex items-center gap-1.5 text-xs text-slate-700 hover:bg-green-50 px-1.5 py-1 rounded">
+                                                                    <input type="checkbox" className="rounded border-green-300 text-green-600 focus:ring-green-500 shrink-0" />
+                                                                    <input
+                                                                        type="text"
+                                                                        defaultValue={firstName}
+                                                                        className="font-medium bg-transparent border-none focus:ring-1 focus:ring-green-300 rounded px-1 -ml-1 w-full text-xs"
+                                                                        placeholder="Name"
+                                                                    />
+                                                                </div>
                                                             );
                                                         })}
                                                     </div>
