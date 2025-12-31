@@ -101,15 +101,44 @@ const parseShiftStartEnd = (timeStr: string) => {
 
 const isStaffCompatibleWithTask = (start: number, end: number, task: TaskRule) => {
     if (start === -1 || end === -1) return false;
+
+    // Special handling for "Last 30 min" tasks - they're always compatible
+    if (task.dueTime === "Last 30 min") return true;
+
     if (task.dueTime === "Closing" || task.code === "CLSE") {
         if (end < 1800) return false;
         return true;
     }
+
     if (task.dueTime) {
         const dueVal = getDueTimeValue(task.dueTime);
+        // Staff must START before the task is due
         if (dueVal < 2200 && start >= dueVal) return false;
+        // Staff must still be working when task is due (end must be AFTER due time)
+        // Handle 24-hour wrap (end > 2400)
+        const normalizedEnd = end > 2400 ? end - 2400 : end;
+        if (dueVal < 2200 && normalizedEnd <= dueVal) return false;
     }
     return true;
+};
+
+// Helper to format shift end time minus 30 minutes
+const formatEndOfShiftTime = (endTime: number): string => {
+    // endTime is in format like 1300 (1:00 PM) or 2400+ for next day
+    let time = endTime - 30; // Subtract 30 minutes
+    if (time < 0) time += 2400;
+
+    let hours = Math.floor(time / 100);
+    const mins = time % 100;
+
+    // Handle next-day wrap
+    if (hours >= 24) hours -= 24;
+
+    const period = hours >= 12 ? 'PM' : 'AM';
+    let displayHours = hours > 12 ? hours - 12 : hours;
+    if (displayHours === 0) displayHours = 12;
+
+    return `${displayHours}:${mins.toString().padStart(2, '0')} ${period}`;
 };
 
 const parseTime = (timeStr: any, role: string, isSpillover = false) => {
@@ -506,17 +535,31 @@ export default function App() {
             }
         }
 
-        // ALL_STAFF TASKS: Assign to everyone
+        // ALL_STAFF TASKS: Assign to everyone with personalized times
         const allStaffTasks = validRules.filter(t => t.type === 'all_staff');
         allStaffTasks.forEach(task => {
             if (task.code === 'FLAS') {
                 // Special handling for Flashfood - split bags among staff
                 const bagsTotal = 10;
                 const bagsPerPerson = Math.ceil(bagsTotal / staff.length);
-                staff.forEach(s => assign(s.name, { ...task, name: `${bagsPerPerson} Flashfood Bags` }));
+                staff.forEach(s => {
+                    const personalizedTask = { ...task, name: `${bagsPerPerson} Flashfood Bags` };
+                    // If task has "Last 30 min" dueTime, calculate actual time based on employee's shift
+                    if (task.dueTime === "Last 30 min" && s.compEnd && s.compEnd > 0) {
+                        personalizedTask.dueTime = formatEndOfShiftTime(s.compEnd);
+                    }
+                    assign(s.name, personalizedTask);
+                });
             } else {
-                // All other all_staff tasks - assign as-is to everyone
-                staff.forEach(s => assign(s.name, task));
+                // All other all_staff tasks - personalize dueTime for each employee
+                staff.forEach(s => {
+                    const personalizedTask = { ...task };
+                    // If task has "Last 30 min" dueTime, calculate actual time based on employee's shift
+                    if (task.dueTime === "Last 30 min" && s.compEnd && s.compEnd > 0) {
+                        personalizedTask.dueTime = formatEndOfShiftTime(s.compEnd);
+                    }
+                    assign(s.name, personalizedTask);
+                });
             }
         });
 
