@@ -474,14 +474,21 @@ export default function App() {
             }
         }
 
-        const flashTask = validRules.find(t => t.code === 'FLAS');
-        if (flashTask) {
-            const bagsTotal = 10;
-            const bagsPerPerson = Math.ceil(bagsTotal / staff.length);
-            staff.forEach(s => assign(s.name, { ...flashTask, name: `${bagsPerPerson} Flashfood Bags` }));
-        }
+        // ALL_STAFF TASKS: Assign to everyone
+        const allStaffTasks = validRules.filter(t => t.type === 'all_staff');
+        allStaffTasks.forEach(task => {
+            if (task.code === 'FLAS') {
+                // Special handling for Flashfood - split bags among staff
+                const bagsTotal = 10;
+                const bagsPerPerson = Math.ceil(bagsTotal / staff.length);
+                staff.forEach(s => assign(s.name, { ...task, name: `${bagsPerPerson} Flashfood Bags` }));
+            } else {
+                // All other all_staff tasks - assign as-is to everyone
+                staff.forEach(s => assign(s.name, task));
+            }
+        });
 
-        validRules.filter(t => t.type === 'skilled' && !['TRCK', 'FLAS'].includes(t.code)).forEach(t => {
+        validRules.filter(t => t.type === 'skilled' && t.code !== 'TRCK').forEach(t => {
             let assigned = false;
             for (const name of t.fallbackChain) {
                 const match = staff.find(s => namesMatch(s.name, name));
@@ -498,7 +505,7 @@ export default function App() {
             }
         });
 
-        const pool = validRules.filter(t => (t.type === 'general' || t.type === 'shift_based') && !['TRCK', 'FLAS'].includes(t.code));
+        const pool = validRules.filter(t => (t.type === 'general' || t.type === 'shift_based'));
         pool.forEach(t => {
             const best = staff.filter(s => isStaffCompatibleWithTask(s.compStart, s.compEnd, t))
                               .sort((a,b) => getWorkerLoad(a.name, newAssignments) - getWorkerLoad(b.name, newAssignments))[0];
