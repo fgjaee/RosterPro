@@ -55,19 +55,22 @@ const getTaskSortPriority = (task: AssignedTask) => {
     if (task.code === 'ORDR') return 2001;
     if (task.code === 'FACE') return 2002;
 
-    // Priority 3: Other skilled/general tasks - Middle priority by due time
-    if (task.type === 'skilled' || task.type === 'general' || task.type === 'shift_based') {
-        return 3000 + getDueTimeValue(task.dueTime);
-    }
-
-    // Priority 4: Universal end-of-shift tasks - These come LAST
-    if (task.type === 'all_staff' || ['FLAS', 'CLNP', 'TRSH', 'THRW'].includes(task.code)) {
-        // Sort these by specific order: FLAS first, then cleanup tasks
+    // Priority 4: Universal end-of-shift tasks - These ALWAYS come LAST
+    // Check by code first (most reliable), regardless of dueTime
+    if (['FLAS', 'CLNP', 'TRSH', 'THRW'].includes(task.code)) {
         if (task.code === 'FLAS') return 9000;
         if (task.code === 'CLNP') return 9001;
         if (task.code === 'TRSH') return 9002;
         if (task.code === 'THRW') return 9003;
-        return 9100; // Other all_staff tasks
+    }
+    // Also check by type as fallback
+    if (task.type === 'all_staff') {
+        return 9100;
+    }
+
+    // Priority 3: Other skilled/general tasks - Middle priority by due time
+    if (task.type === 'skilled' || task.type === 'general' || task.type === 'shift_based') {
+        return 3000 + getDueTimeValue(task.dueTime);
     }
 
     // Default: Sort by due time
