@@ -463,6 +463,16 @@ export default function App() {
 
   const [manualTaskInput, setManualTaskInput] = useState<{emp: string, text: string} | null>(null);
   const [moveTaskModal, setMoveTaskModal] = useState<{empName: string, task: AssignedTask} | null>(null);
+
+  // Drag and drop state
+  const [draggedTask, setDraggedTask] = useState<{task: AssignedTask, fromEmployee: string} | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  // Task completion tracking
+  const [completedTasks, setCompletedTasks] = useState<Record<string, Set<string>>>({});
+
+  // Auto-assign undo
+  const [previousAssignments, setPreviousAssignments] = useState<TaskAssignmentMap | null>(null);
   const [isEditingPinned, setIsEditingPinned] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -770,6 +780,9 @@ export default function App() {
   const runAutoDistribute = () => {
     setShowAutoAssignConfirm(false);
     try {
+        // Save current state for undo
+        setPreviousAssignments({ ...assignments });
+
         const staff = getDailyStaff();
         if (staff.length === 0) return;
 
@@ -845,6 +858,13 @@ export default function App() {
         setAssignments(newAssignments);
     } catch (e: any) {
         alert(`Auto-assign failed: ${e.message}`);
+    }
+  };
+
+  const handleUndoAutoAssign = () => {
+    if (previousAssignments) {
+      setAssignments(previousAssignments);
+      setPreviousAssignments(null);
     }
   };
 
@@ -970,6 +990,70 @@ export default function App() {
           ...prev,
           [key]: prev[key].map(t => t.instanceId === instanceId ? { ...t, name: newName } : t)
       }));
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (task: AssignedTask, fromEmployee: string) => {
+      setDraggedTask({ task, fromEmployee });
+  };
+
+  const handleDragOver = (e: React.DragEvent, employeeName: string) => {
+      e.preventDefault();
+      setDropTarget(employeeName);
+  };
+
+  const handleDragLeave = () => {
+      setDropTarget(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, toEmployee: string) => {
+      e.preventDefault();
+      if (!draggedTask || draggedTask.fromEmployee === toEmployee) {
+          setDraggedTask(null);
+          setDropTarget(null);
+          return;
+      }
+
+      const fromKey = `${selectedDay}-${draggedTask.fromEmployee}`;
+      const toKey = `${selectedDay}-${toEmployee}`;
+
+      setAssignments(prev => ({
+          ...prev,
+          [fromKey]: prev[fromKey].filter(t => t.instanceId !== draggedTask.task.instanceId),
+          [toKey]: [...(prev[toKey] || []), draggedTask.task]
+      }));
+
+      setDraggedTask(null);
+      setDropTarget(null);
+  };
+
+  // Task completion tracking
+  const toggleTaskCompletion = (employeeName: string, taskInstanceId: string) => {
+      const dayKey = selectedDay;
+      setCompletedTasks(prev => {
+          const current = prev[dayKey] ? new Set(prev[dayKey]) : new Set<string>();
+          const taskKey = `${employeeName}-${taskInstanceId}`;
+
+          if (current.has(taskKey)) {
+              current.delete(taskKey);
+          } else {
+              current.add(taskKey);
+          }
+
+          return { ...prev, [dayKey]: current };
+      });
+  };
+
+  const isTaskCompleted = (employeeName: string, taskInstanceId: string): boolean => {
+      const dayKey = selectedDay;
+      const taskKey = `${employeeName}-${taskInstanceId}`;
+      return completedTasks[dayKey]?.has(taskKey) || false;
+  };
+
+  const getCompletionStats = () => {
+      const total = Object.values(assignments).flat().length;
+      const completed = completedTasks[selectedDay]?.size || 0;
+      return { total, completed, percentage: total > 0 ? Math.round((completed / total) * 100) : 0 };
   };
 
   const handleAddManualTask = () => {
@@ -1152,8 +1236,13 @@ export default function App() {
                      </button>
                      <div className="h-6 w-px bg-slate-200 mx-2"></div>
                      <button onClick={() => setShowDBModal(true)} className="flex items-center gap-2 px-4 py-2 text-slate-600 font-bold text-sm bg-slate-100 hover:bg-slate-200 rounded-lg"><Menu size={18}/> Rules</button>
-                     <button onClick={handleClearDay} className="flex items-center gap-2 px-4 py-2 text-red-600 font-bold text-sm hover:bg-red-50 rounded-lg"><RotateCcw size={18}/> Clear</button>
+                     <button onClick={handleClearDay} className="flex items-center gap-2 px-4 py-2 text-red-600 font-bold text-sm hover:bg-red-50 rounded-lg"><Eraser size={18}/> Clear</button>
                      <button onClick={handleOpenPrintModal} className="flex items-center gap-2 px-4 py-2 text-slate-600 font-bold text-sm bg-white border border-slate-200 hover:bg-slate-50 rounded-lg"><Printer size={18}/> Print</button>
+                     {previousAssignments && (
+                       <button onClick={handleUndoAutoAssign} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm rounded-lg shadow-lg">
+                         <RotateCcw size={18}/> Undo Auto-Assign
+                       </button>
+                     )}
                      <button onClick={() => setShowAutoAssignConfirm(true)} className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-lg shadow-lg">
                         <Wand2 size={18}/> Auto-Assign
                      </button>
@@ -1178,6 +1267,16 @@ export default function App() {
                                     <div className="text-2xl font-black text-green-600">{Object.values(assignments).flat().length}</div>
                                     <div className="text-[10px] font-bold text-slate-400 uppercase">Tasks</div>
                                 </div>
+                                {(() => {
+                                    const stats = getCompletionStats();
+                                    if (stats.total === 0) return null;
+                                    return (
+                                        <div className="text-center">
+                                            <div className="text-2xl font-black text-emerald-600">{stats.percentage}%</div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">{stats.completed}/{stats.total} Done</div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -1324,40 +1423,80 @@ export default function App() {
                             const tasks = (assignments[`${selectedDay}-${staff.name}`] || []).sort((a,b) => getTaskSortPriority(a) - getTaskSortPriority(b));
                             const { label, category } = parseTime(staff.activeTime, staff.role, staff.isSpillover);
                             const hours = (getWorkerLoad(staff.name, assignments) / 60).toFixed(1);
+                            const completedCount = tasks.filter(t => isTaskCompleted(staff.name, t.instanceId)).length;
+                            const isDropZone = dropTarget === staff.name;
+
                             return (
-                                <div key={staff.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden break-inside-avoid">
+                                <div
+                                    key={staff.id}
+                                    className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden break-inside-avoid transition-all ${
+                                        isDropZone ? 'border-indigo-500 ring-4 ring-indigo-200 scale-[1.02]' : 'border-slate-200'
+                                    }`}
+                                    onDragOver={(e) => handleDragOver(e, staff.name)}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={(e) => handleDrop(e, staff.name)}
+                                >
                                     <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                                         <div>
                                             <h3 className="font-bold text-lg text-slate-800 leading-none">{staff.name}</h3>
                                             <div className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-wide flex items-center gap-2">
                                                 {label} <span className={`px-1.5 rounded text-[10px] ${staff.isSpillover ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'}`}>{category}</span>
+                                                {completedCount > 0 && <span className="px-1.5 rounded text-[10px] bg-green-100 text-green-700">{completedCount}/{tasks.length} ✓</span>}
                                             </div>
                                         </div>
                                         <div className="text-right print:hidden">
                                             <div className="text-xs font-bold text-slate-400">~{hours}h Load</div>
                                         </div>
                                     </div>
-                                    <div className="p-2 min-h-[120px]">
+                                    <div className={`p-2 min-h-[120px] transition-colors ${isDropZone ? 'bg-indigo-50' : ''}`}>
+                                        {isDropZone && (
+                                            <div className="text-center py-4 text-indigo-600 font-bold text-sm">
+                                                Drop task here
+                                            </div>
+                                        )}
                                         <ul className="space-y-1">
-                                            {tasks.map((t) => (
-                                                <li key={t.instanceId} className="group flex items-start p-2 rounded hover:bg-slate-50 border border-transparent hover:border-indigo-100">
-                                                    <div className="mr-2 mt-0.5"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getBadgeColor(t.code)}`}>{t.code}</span></div>
-                                                    <div className="flex-1">
-                                                        <div className="flex justify-between items-start">
-                                                            <input
-                                                                className="w-full text-sm font-medium text-slate-700 bg-transparent border-none focus:ring-1 focus:ring-indigo-300 rounded px-1 -ml-1"
-                                                                value={cleanTaskName(t.name)}
-                                                                onChange={(e) => handleUpdateTaskName(staff.name, t.instanceId, e.target.value)}
-                                                            />
-                                                            {t.dueTime && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 rounded ml-2 whitespace-nowrap">By {t.dueTime}</span>}
+                                            {tasks.map((t) => {
+                                                const isCompleted = isTaskCompleted(staff.name, t.instanceId);
+                                                const isDragging = draggedTask?.task.instanceId === t.instanceId;
+
+                                                return (
+                                                    <li
+                                                        key={t.instanceId}
+                                                        draggable
+                                                        onDragStart={() => handleDragStart(t, staff.name)}
+                                                        className={`group flex items-start p-2 rounded border transition-all cursor-move ${
+                                                            isDragging ? 'opacity-50 scale-95' :
+                                                            isCompleted ? 'bg-green-50 border-green-200' :
+                                                            'hover:bg-slate-50 border-transparent hover:border-indigo-100'
+                                                        }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isCompleted}
+                                                            onChange={() => toggleTaskCompletion(staff.name, t.instanceId)}
+                                                            className="mr-2 mt-1 rounded border-slate-300 text-green-600 focus:ring-green-500 cursor-pointer shrink-0"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <div className="mr-2 mt-0.5"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getBadgeColor(t.code)}`}>{t.code}</span></div>
+                                                        <div className="flex-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <input
+                                                                    className={`w-full text-sm font-medium bg-transparent border-none focus:ring-1 focus:ring-indigo-300 rounded px-1 -ml-1 ${
+                                                                        isCompleted ? 'text-slate-400 line-through' : 'text-slate-700'
+                                                                    }`}
+                                                                    value={cleanTaskName(t.name)}
+                                                                    onChange={(e) => handleUpdateTaskName(staff.name, t.instanceId, e.target.value)}
+                                                                />
+                                                                {t.dueTime && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 rounded ml-2 whitespace-nowrap">By {t.dueTime}</span>}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => setMoveTaskModal({ empName: staff.name, task: t })} className="text-slate-300 hover:text-indigo-500" title="Move"><ArrowRightLeft size={14} /></button>
-                                                        <button onClick={() => handleDeleteTask(staff.name, t.instanceId)} className="text-slate-300 hover:text-red-500" title="Delete"><Trash2 size={14} /></button>
-                                                    </div>
-                                                </li>
-                                            ))}
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={() => setMoveTaskModal({ empName: staff.name, task: t })} className="text-slate-300 hover:text-indigo-500" title="Move"><ArrowRightLeft size={14} /></button>
+                                                            <button onClick={() => handleDeleteTask(staff.name, t.instanceId)} className="text-slate-300 hover:text-red-500" title="Delete"><Trash2 size={14} /></button>
+                                                        </div>
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     </div>
                                     <div className="p-2 border-t border-slate-100 bg-slate-50 print:hidden">
@@ -1714,12 +1853,42 @@ export default function App() {
       {/* Auto Assign Confirmation */}
       {showAutoAssignConfirm && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
-                <h3 className="text-lg font-bold mb-2">Run Auto-Assign?</h3>
-                <p className="text-slate-600 text-sm mb-6">This will intelligently redistribute tasks for this day based on employee roles and availability.</p>
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+                <div className="flex items-start gap-3 mb-4">
+                    <div className="bg-indigo-100 p-2 rounded-lg">
+                        <Wand2 size={24} className="text-indigo-600"/>
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-slate-900">Run Smart Auto-Assign?</h3>
+                        <p className="text-slate-600 text-sm mt-1">Intelligently distribute tasks for {DAY_LABELS[selectedDay]} based on rules and load balancing.</p>
+                    </div>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Sparkles size={16} className="text-indigo-600"/>
+                        <span className="font-bold text-sm text-indigo-900">What will happen:</span>
+                    </div>
+                    <ul className="text-sm text-indigo-800 space-y-1 ml-6">
+                        <li className="list-disc">Clear existing assignments for {DAY_LABELS[selectedDay]}</li>
+                        <li className="list-disc">Assign {unassignedTasks.length} unassigned tasks</li>
+                        <li className="list-disc">Respect task rules (skilled, shift-based, frequencies)</li>
+                        <li className="list-disc">Balance workload across {getDailyStaff().length} staff members</li>
+                    </ul>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+                    <div className="flex items-start gap-2">
+                        <AlertCircle size={16} className="text-amber-600 mt-0.5"/>
+                        <p className="text-xs text-amber-800">
+                            <span className="font-bold">Note:</span> You can undo this action using the "Undo Auto-Assign" button that will appear after running.
+                        </p>
+                    </div>
+                </div>
+
                 <div className="flex gap-3">
-                    <button onClick={() => setShowAutoAssignConfirm(false)} className="flex-1 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg">Cancel</button>
-                    <button onClick={runAutoDistribute} className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg">Distribute</button>
+                    <button onClick={() => setShowAutoAssignConfirm(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors">Cancel</button>
+                    <button onClick={runAutoDistribute} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition-colors">Run Auto-Assign</button>
                 </div>
             </div>
         </div>
