@@ -1162,31 +1162,59 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
                 <div className="max-w-[1600px] mx-auto">
-                    <div className="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4 shadow-sm rounded-r-lg flex items-start gap-4 no-print">
-                        <div className="p-2 bg-amber-100 rounded-full text-amber-600">
-                            <Megaphone size={20} />
+                    {/* Smart Title Header - Matches Print */}
+                    <div className="mb-4 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">{generatePrintTitle()}</h1>
+                                <div className="font-bold text-slate-500 uppercase text-sm mt-1">{DAY_LABELS[selectedDay]} | {schedule?.week_period}</div>
+                            </div>
+                            <div className="flex gap-4 text-sm">
+                                <div className="text-center">
+                                    <div className="text-2xl font-black text-indigo-600">{getDailyStaff().length}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase">Staff</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-black text-green-600">{Object.values(assignments).flat().length}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase">Tasks</div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-center mb-1">
-                                <h3 className="font-bold text-amber-900 uppercase text-xs tracking-wider">Team Announcements</h3>
-                                <button onClick={() => setIsEditingPinned(!isEditingPinned)} className="text-amber-500 hover:text-amber-700">
-                                    <Edit3 size={14}/>
+                    </div>
+
+                    {/* Team Announcements - Matches Print Style */}
+                    <div className="mb-6 bg-amber-50 border-2 border-amber-300 rounded-xl shadow-sm p-4 no-print">
+                        <div className="flex justify-between items-start mb-3">
+                            <h3 className="text-sm font-bold text-amber-800 uppercase tracking-wide">Team:</h3>
+                            <button onClick={() => setIsEditingPinned(!isEditingPinned)} className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 p-1 rounded transition-colors">
+                                <Edit3 size={16}/>
+                            </button>
+                        </div>
+                        {isEditingPinned ? (
+                            <div className="flex flex-col gap-2">
+                                <textarea
+                                    className="w-full p-3 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+                                    rows={3}
+                                    value={pinnedMessage}
+                                    onChange={(e) => setPinnedMessage(e.target.value)}
+                                    placeholder="Enter team announcements (one per line)"
+                                />
+                                <button onClick={() => setIsEditingPinned(false)} className="self-end px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg shadow transition-colors">
+                                    <Check size={14} className="inline mr-1"/> Save
                                 </button>
                             </div>
-                            {isEditingPinned ? (
-                                <div className="flex flex-col gap-2">
-                                    <textarea
-                                        className="w-full p-2 border border-amber-200 rounded text-sm focus:ring-2 focus:ring-amber-400 outline-none"
-                                        rows={3}
-                                        value={pinnedMessage}
-                                        onChange={(e) => setPinnedMessage(e.target.value)}
-                                    />
-                                    <button onClick={() => setIsEditingPinned(false)} className="self-end px-3 py-1 bg-amber-500 text-white text-xs font-bold rounded">Save Message</button>
-                                </div>
-                            ) : (
-                                <p className="text-slate-800 text-sm font-medium whitespace-pre-wrap">{pinnedMessage || "No announcements set."}</p>
-                            )}
-                        </div>
+                        ) : pinnedMessage ? (
+                            <ul className="text-sm font-medium text-slate-900 space-y-2">
+                                {pinnedMessage.split('\n').filter(l => l.trim()).map((line, i) => (
+                                    <li key={i} className="flex items-start gap-2">
+                                        <span className="text-amber-600 font-bold mt-0.5">•</span>
+                                        <span className="flex-1">{line.trim()}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-amber-600/60 text-sm italic">No announcements. Click edit to add.</p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
