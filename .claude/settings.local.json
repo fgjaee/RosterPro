@@ -14,7 +14,13 @@
       "Bash(vercel inspect:*)",
       "Bash(git commit:*)",
       "Bash(vercel env:*)",
-      "Bash(printf:*)"
+      "Bash(printf:*)",
+      "Bash(npm install:*)",
+      "Bash(ls:*)",
+      "Bash(npm run dev:*)",
+      "Bash(node -e:*)",
+      "Bash(vercel ls:*)",
+      "Bash(cat:*)"
     ]
   }
 }

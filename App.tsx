@@ -921,18 +921,7 @@ export default function App() {
     }
   };
 
-  if (isLoading || !schedule) {
-      return (
-          <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-100 text-slate-500 gap-4">
-              <Loader2 size={48} className="animate-spin text-indigo-600"/>
-              <p className="font-medium">Connecting to database...</p>
-          </div>
-      );
-  }
-
-  const shiftOptions = COMMON_SHIFTS;
-
-  // Show auth modal if not authenticated
+  // Show loading spinner while checking authentication
   if (isCheckingAuth) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-100">
@@ -941,9 +930,22 @@ export default function App() {
     );
   }
 
+  // Show auth modal if not authenticated
   if (!isAuthenticated) {
     return <AuthModal onAuthenticated={() => setIsAuthenticated(true)} />;
   }
+
+  // Show loading spinner while fetching data
+  if (isLoading || !schedule) {
+      return (
+          <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-100 text-slate-500 gap-4">
+              <Loader2 size={48} className="animate-spin text-indigo-600"/>
+              <p className="font-medium">Loading your data...</p>
+          </div>
+      );
+  }
+
+  const shiftOptions = COMMON_SHIFTS;
 
   return (
     <>
