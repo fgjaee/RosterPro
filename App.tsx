@@ -18,6 +18,7 @@ import { AuthService } from './services/authService';
 import TaskDBModal from './components/TaskDBModal';
 import { ScheduleTemplates } from './components/ScheduleTemplates';
 import { TouchScheduler } from './components/TouchScheduler';
+import { VisualShiftEditor } from './components/VisualShiftEditor';
 import { AuthModal } from './components/AuthModal';
 
 // --- Utility Functions ---
@@ -432,7 +433,7 @@ const PrintableRoster = ({
 export default function App() {
   const [activeTab, setActiveTab] = useState<'schedule' | 'tasks' | 'team'>('tasks');
   const [selectedDay, setSelectedDay] = useState<DayKey>('fri');
-  const [showTouchScheduler, setShowTouchScheduler] = useState(false);
+  const [scheduleViewMode, setScheduleViewMode] = useState<'grid' | 'touch' | 'visual'>('visual');
 
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [taskDB, setTaskDB] = useState<TaskRule[]>([]);
@@ -1248,22 +1249,52 @@ export default function App() {
                     />
                 </div>
 
-                {/* Touch Scheduler Toggle - NEW */}
+                {/* Schedule View Selector */}
                 <div className="w-full max-w-6xl mb-4 bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-                    <span className="text-sm font-bold text-slate-600">Mobile Touch Editor</span>
-                    <button
-                        onClick={() => setShowTouchScheduler(!showTouchScheduler)}
-                        className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${
-                            showTouchScheduler 
-                                ? 'bg-blue-600 text-white' 
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                    >
-                        {showTouchScheduler ? 'Show Grid View' : 'Show Touch View'}
-                    </button>
+                    <span className="text-sm font-bold text-slate-600">Schedule View</span>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setScheduleViewMode('visual')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${
+                                scheduleViewMode === 'visual'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            Visual Editor
+                        </button>
+                        <button
+                            onClick={() => setScheduleViewMode('touch')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${
+                                scheduleViewMode === 'touch'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            Touch View
+                        </button>
+                        <button
+                            onClick={() => setScheduleViewMode('grid')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${
+                                scheduleViewMode === 'grid'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            Grid View
+                        </button>
+                    </div>
                 </div>
 
-                {showTouchScheduler ? (
+                {scheduleViewMode === 'visual' ? (
+                    /* Visual Shift Editor - NEW */
+                    <div className="w-full max-w-6xl max-h-[calc(100vh-300px)]">
+                        <VisualShiftEditor
+                            shifts={schedule.shifts}
+                            onUpdateShifts={(updatedShifts) => setSchedule({ ...schedule, shifts: updatedShifts })}
+                        />
+                    </div>
+                ) : scheduleViewMode === 'touch' ? (
                     /* Touch Scheduler View - NEW */
                     <div className="w-full max-w-6xl bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-h-[calc(100vh-300px)] overflow-y-auto">
                         <TouchScheduler
