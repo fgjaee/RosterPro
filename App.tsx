@@ -273,17 +273,16 @@ const PrintableRoster = ({
                     <div className="font-bold text-slate-600 uppercase text-sm mt-1">{settings.dayLabel}</div>
                 </div>
                 {pinnedMessage && (
-                    <div className="max-w-md text-right bg-amber-50 p-2 rounded-lg border border-amber-200 ml-4">
-                        <div className="text-[9px] font-bold text-amber-700 uppercase mb-0.5">{settings.announcementTitle}</div>
-                        {settings.announcementFormat === 'list' ? (
-                            <ul className="text-xs font-medium text-slate-800 list-disc list-inside text-left">
-                                {pinnedMessage.split('\n').filter(l => l.trim()).map((line, i) => (
-                                    <li key={i}>{line}</li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <div className="text-xs font-medium text-slate-800 whitespace-pre-wrap">{pinnedMessage}</div>
-                        )}
+                    <div className="max-w-md bg-amber-50 p-3 rounded-lg border-2 border-amber-300 ml-4">
+                        <div className="text-xs font-bold text-amber-800 uppercase mb-2 tracking-wide">{settings.announcementTitle}</div>
+                        <ul className="text-xs font-medium text-slate-900 space-y-1 text-left">
+                            {pinnedMessage.split('\n').filter(l => l.trim()).map((line, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                    <span className="text-amber-600 font-bold mt-0.5">•</span>
+                                    <span className="flex-1">{line.trim()}</span>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
             </div>
