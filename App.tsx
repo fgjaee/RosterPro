@@ -250,15 +250,30 @@ const PrintableRoster = ({
         mono: 'font-mono'
     }[settings.fontStyle] || 'font-sans';
 
+    const hasDateInfo = settings.pageTitle && !Object.values(DAY_LABELS).includes(settings.pageTitle);
+
     return (
         <div className={`p-4 bg-white text-slate-900 w-full h-full ${fontClass}`}>
             <div className="mb-3 border-b-2 border-slate-900 pb-2 flex justify-between items-start">
-                <div>
-                    <h1 className="text-2xl font-black uppercase tracking-tight">{settings.pageTitle}</h1>
-                    <div className="font-bold text-slate-600 uppercase text-sm">{settings.dayLabel}</div>
+                <div className="flex-1">
+                    {settings.pageTitle ? (
+                        <h1 className="text-2xl font-black uppercase tracking-tight">{settings.pageTitle}</h1>
+                    ) : (
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-sm font-bold text-slate-400">Date:</span>
+                            <div className="flex-1 border-b-2 border-dotted border-slate-300 h-8"></div>
+                        </div>
+                    )}
+                    {!hasDateInfo && settings.pageTitle && (
+                        <div className="mt-1 flex items-baseline gap-2">
+                            <span className="text-xs font-bold text-slate-400">Date:</span>
+                            <div className="flex-1 border-b border-dotted border-slate-300 h-6"></div>
+                        </div>
+                    )}
+                    <div className="font-bold text-slate-600 uppercase text-sm mt-1">{settings.dayLabel}</div>
                 </div>
                 {pinnedMessage && (
-                    <div className="max-w-md text-right bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    <div className="max-w-md text-right bg-amber-50 p-2 rounded-lg border border-amber-200 ml-4">
                         <div className="text-[9px] font-bold text-amber-700 uppercase mb-0.5">{settings.announcementTitle}</div>
                         {settings.announcementFormat === 'list' ? (
                             <ul className="text-xs font-medium text-slate-800 list-disc list-inside text-left">
@@ -466,8 +481,8 @@ export default function App() {
       fontSize: 'normal',
       showTimes: true,
       dayLabel: '',
-      pageTitle: 'Daily Roster & Worklist',
-      announcementTitle: 'Team Announcements',
+      pageTitle: '',
+      announcementTitle: 'Team:',
       fontStyle: 'sans',
       announcementFormat: 'text'
   });
@@ -555,8 +570,108 @@ export default function App() {
   useEffect(() => { if (team.length) saveData('team', () => StorageService.saveTeam(team)); }, [team]);
   useEffect(() => { if (pinnedMessage) saveData('pinned', () => StorageService.savePinnedMessage(pinnedMessage)); }, [pinnedMessage]);
 
+  // Helper: Get ordinal suffix for dates (1st, 2nd, 3rd, etc.)
+  const getOrdinalSuffix = (day: number): string => {
+      if (day > 3 && day < 21) return 'th';
+      switch (day % 10) {
+          case 1: return 'st';
+          case 2: return 'nd';
+          case 3: return 'rd';
+          default: return 'th';
+      }
+  };
+
+  // Helper: Check if date is a US holiday
+  const getHolidayName = (date: Date): string | null => {
+      const month = date.getMonth();
+      const day = date.getDate();
+      const dayOfWeek = date.getDay();
+
+      // Fixed date holidays
+      if (month === 0 && day === 1) return '🎆 New Year\'s Day';
+      if (month === 6 && day === 4) return '🎇 Independence Day';
+      if (month === 10 && day === 11) return '🇺🇸 Veterans Day';
+      if (month === 11 && day === 25) return '🎄 Christmas Day';
+
+      // MLK Day (3rd Monday of January)
+      if (month === 0 && dayOfWeek === 1) {
+          const nthMonday = Math.ceil(day / 7);
+          if (nthMonday === 3) return '✊ MLK Day';
+      }
+
+      // Memorial Day (Last Monday of May)
+      if (month === 4 && dayOfWeek === 1 && day > 24) return '🇺🇸 Memorial Day';
+
+      // Labor Day (1st Monday of September)
+      if (month === 8 && dayOfWeek === 1 && day <= 7) return '⚒️ Labor Day';
+
+      // Thanksgiving (4th Thursday of November)
+      if (month === 10 && dayOfWeek === 4) {
+          const nthThursday = Math.ceil(day / 7);
+          if (nthThursday === 4) return '🦃 Thanksgiving';
+      }
+
+      return null;
+  };
+
+  // Helper: Generate smart print title
+  const generatePrintTitle = (): string => {
+      const dayName = DAY_LABELS[selectedDay];
+
+      // Try to extract date from week_period
+      const weekPeriod = schedule?.week_period || '';
+      const dateMatch = weekPeriod.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+
+      if (dateMatch) {
+          const [, month, day, year] = dateMatch;
+          const date = new Date(parseInt(year.length === 2 ? `20${year}` : year), parseInt(month) - 1, parseInt(day));
+
+          // Calculate which day of the week this date falls on
+          const dayIndex = ORDERED_DAYS.indexOf(selectedDay);
+          const targetDate = new Date(date);
+          targetDate.setDate(date.getDate() + dayIndex);
+
+          const dayNum = targetDate.getDate();
+          const holiday = getHolidayName(targetDate);
+
+          if (holiday) {
+              return `${dayName} ${dayNum}${getOrdinalSuffix(dayNum)} - ${holiday}`;
+          }
+          return `${dayName} ${dayNum}${getOrdinalSuffix(dayNum)}`;
+      }
+
+      // Fallback: Try current date
+      const today = new Date();
+      const dayIndex = ORDERED_DAYS.indexOf(selectedDay);
+      const currentDayIndex = today.getDay();
+
+      // If selected day is within this week
+      if (Math.abs(dayIndex - currentDayIndex) <= 3) {
+          const offset = dayIndex - currentDayIndex;
+          const targetDate = new Date(today);
+          targetDate.setDate(today.getDate() + offset);
+
+          const dayNum = targetDate.getDate();
+          const holiday = getHolidayName(targetDate);
+
+          if (holiday) {
+              return `${dayName} ${dayNum}${getOrdinalSuffix(dayNum)} - ${holiday}`;
+          }
+          return `${dayName} ${dayNum}${getOrdinalSuffix(dayNum)}`;
+      }
+
+      // Last resort: Just the day name
+      return dayName;
+  };
+
   const handleOpenPrintModal = () => {
-      setPrintSettings(prev => ({ ...prev, dayLabel: `${DAY_LABELS[selectedDay]} | ${schedule?.week_period}` }));
+      const smartTitle = generatePrintTitle();
+      setPrintSettings(prev => ({
+          ...prev,
+          dayLabel: `${DAY_LABELS[selectedDay]} | ${schedule?.week_period}`,
+          pageTitle: smartTitle,
+          announcementTitle: 'Team:'
+      }));
       setShowPrintModal(true);
   };
 
