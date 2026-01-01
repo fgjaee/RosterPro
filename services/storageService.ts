@@ -1,102 +1,331 @@
-
-import { ScheduleData, TaskRule, TaskAssignmentMap, INITIAL_SCHEDULE, Employee } from "../types";
+import { ScheduleData, TaskRule, TaskAssignmentMap, Employee } from "../types";
 import { DEFAULT_TASK_DB, DEFAULT_TEAM } from "../constants";
+import { supabase, TABLES } from './supabaseClient';
 
-// Updated version keys to force refresh of data structure to v8
-// v8: Added universal end-of-shift tasks (CLNP, TRSH, THRW) and fixed PEI scheduling
-const KEYS = {
-  SCHEDULE: 'smartRoster_schedule_v8',
-  TASK_DB: 'smartRoster_taskDB_v8',
-  ASSIGNMENTS: 'smartRoster_assignments_v8',
-  TEAM: 'smartRoster_team_v8',
-  PINNED_MSG: 'smartRoster_pinned_msg_v1'
+// Helper to get current user ID
+const getUserId = async (): Promise<string> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
 };
 
 export const StorageService = {
+  // --- Schedule Management ---
   getSchedule: async (): Promise<ScheduleData> => {
-    const data = localStorage.getItem(KEYS.SCHEDULE);
-    if (data) {
-        return JSON.parse(data);
-    }
+    try {
+      const userId = await getUserId();
+      const { data, error } = await supabase
+        .from(TABLES.SCHEDULE)
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-    // CRITICAL FIX: If no schedule exists, generate it dynamically from the Hardcoded Team.
-    // This prevents "overwriting" with generic dummy data.
-    return {
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+
+      if (data && data.schedule_data) {
+        return data.schedule_data as ScheduleData;
+      }
+
+      // No schedule exists, generate from default team
+      return {
         week_period: 'New Week',
         shifts: DEFAULT_TEAM.map((emp, index) => ({
-            id: emp.id || String(index + 1),
-            name: emp.name,
-            role: emp.role,
-            sun: "OFF", 
-            mon: "OFF", 
-            tue: "OFF", 
-            wed: "OFF", 
-            thu: "OFF", 
-            fri: "OFF", 
-            sat: "OFF"
+          id: emp.id || String(index + 1),
+          name: emp.name,
+          role: emp.role,
+          sun: "OFF",
+          mon: "OFF",
+          tue: "OFF",
+          wed: "OFF",
+          thu: "OFF",
+          fri: "OFF",
+          sat: "OFF"
         }))
-    };
+      };
+    } catch (error) {
+      console.error('Error fetching schedule:', error);
+      throw error;
+    }
   },
 
   saveSchedule: async (data: ScheduleData): Promise<void> => {
-    localStorage.setItem(KEYS.SCHEDULE, JSON.stringify(data));
+    try {
+      const userId = await getUserId();
+
+      // Check if schedule exists
+      const { data: existing } = await supabase
+        .from(TABLES.SCHEDULE)
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (existing) {
+        // Update existing schedule
+        const { error } = await supabase
+          .from(TABLES.SCHEDULE)
+          .update({
+            schedule_data: data,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+      } else {
+        // Insert new schedule
+        const { error } = await supabase
+          .from(TABLES.SCHEDULE)
+          .insert({
+            user_id: userId,
+            schedule_data: data
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving schedule:', error);
+      throw error;
+    }
   },
 
+  // --- Task DB Management ---
   getTaskDB: async (): Promise<TaskRule[]> => {
-    const data = localStorage.getItem(KEYS.TASK_DB);
-    // If no data found, return the full new default DB
-    return data ? JSON.parse(data) : DEFAULT_TASK_DB;
+    try {
+      const userId = await getUserId();
+      const { data, error } = await supabase
+        .from(TABLES.TASK_DB)
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      return data?.tasks || DEFAULT_TASK_DB;
+    } catch (error) {
+      console.error('Error fetching task DB:', error);
+      return DEFAULT_TASK_DB;
+    }
   },
 
   saveTaskDB: async (data: TaskRule[]): Promise<void> => {
-    localStorage.setItem(KEYS.TASK_DB, JSON.stringify(data));
+    try {
+      const userId = await getUserId();
+
+      const { data: existing } = await supabase
+        .from(TABLES.TASK_DB)
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from(TABLES.TASK_DB)
+          .update({
+            tasks: data,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from(TABLES.TASK_DB)
+          .insert({
+            user_id: userId,
+            tasks: data
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving task DB:', error);
+      throw error;
+    }
   },
 
+  // --- Task Assignments ---
   getAssignments: async (): Promise<TaskAssignmentMap> => {
-    const data = localStorage.getItem(KEYS.ASSIGNMENTS);
-    return data ? JSON.parse(data) : {};
+    try {
+      const userId = await getUserId();
+      const { data, error } = await supabase
+        .from(TABLES.ASSIGNMENTS)
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      return data?.assignments || {};
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+      return {};
+    }
   },
 
   saveAssignments: async (data: TaskAssignmentMap): Promise<void> => {
-    localStorage.setItem(KEYS.ASSIGNMENTS, JSON.stringify(data));
+    try {
+      const userId = await getUserId();
+
+      const { data: existing } = await supabase
+        .from(TABLES.ASSIGNMENTS)
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from(TABLES.ASSIGNMENTS)
+          .update({
+            assignments: data,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from(TABLES.ASSIGNMENTS)
+          .insert({
+            user_id: userId,
+            assignments: data
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving assignments:', error);
+      throw error;
+    }
   },
 
   // --- Team / Employee Management ---
   getTeam: async (): Promise<Employee[]> => {
-      const data = localStorage.getItem(KEYS.TEAM);
-      if(data) return JSON.parse(data);
-      
-      // Use the hardcoded default team from constants
+    try {
+      const userId = await getUserId();
+      const { data, error } = await supabase
+        .from(TABLES.TEAM)
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      return data?.team_members || DEFAULT_TEAM;
+    } catch (error) {
+      console.error('Error fetching team:', error);
       return DEFAULT_TEAM;
+    }
   },
 
   saveTeam: async (data: Employee[]): Promise<void> => {
-      localStorage.setItem(KEYS.TEAM, JSON.stringify(data));
+    try {
+      const userId = await getUserId();
+
+      const { data: existing } = await supabase
+        .from(TABLES.TEAM)
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from(TABLES.TEAM)
+          .update({
+            team_members: data,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from(TABLES.TEAM)
+          .insert({
+            user_id: userId,
+            team_members: data
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving team:', error);
+      throw error;
+    }
   },
 
   // --- Pinned Message ---
   getPinnedMessage: async (): Promise<string> => {
-    return localStorage.getItem(KEYS.PINNED_MSG) || "Welcome to the team! Focus on safety and customers today.";
+    try {
+      const userId = await getUserId();
+      const { data, error } = await supabase
+        .from(TABLES.SETTINGS)
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      return data?.pinned_message || "Welcome to the team! Focus on safety and customers today.";
+    } catch (error) {
+      console.error('Error fetching pinned message:', error);
+      return "Welcome to the team! Focus on safety and customers today.";
+    }
   },
 
   savePinnedMessage: async (msg: string): Promise<void> => {
-    localStorage.setItem(KEYS.PINNED_MSG, msg);
+    try {
+      const userId = await getUserId();
+
+      const { data: existing } = await supabase
+        .from(TABLES.SETTINGS)
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from(TABLES.SETTINGS)
+          .update({
+            pinned_message: msg,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from(TABLES.SETTINGS)
+          .insert({
+            user_id: userId,
+            pinned_message: msg
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving pinned message:', error);
+      throw error;
+    }
   },
 
-  // Export full backup
+  // --- Export / Import ---
   exportData: async () => {
-    // Ensure we grab current state or defaults if null
-    const schedule = localStorage.getItem(KEYS.SCHEDULE) ? JSON.parse(localStorage.getItem(KEYS.SCHEDULE)!) : (await StorageService.getSchedule());
-    const team = localStorage.getItem(KEYS.TEAM) ? JSON.parse(localStorage.getItem(KEYS.TEAM)!) : DEFAULT_TEAM;
+    const schedule = await StorageService.getSchedule();
+    const taskDB = await StorageService.getTaskDB();
+    const assignments = await StorageService.getAssignments();
+    const team = await StorageService.getTeam();
+    const pinnedMsg = await StorageService.getPinnedMessage();
 
     const exportObj = {
       schedule,
-      taskDB: localStorage.getItem(KEYS.TASK_DB) ? JSON.parse(localStorage.getItem(KEYS.TASK_DB)!) : DEFAULT_TASK_DB,
-      assignments: localStorage.getItem(KEYS.ASSIGNMENTS) ? JSON.parse(localStorage.getItem(KEYS.ASSIGNMENTS)!) : {},
+      taskDB,
+      assignments,
       team,
-      pinnedMsg: localStorage.getItem(KEYS.PINNED_MSG) || "",
+      pinnedMsg,
       timestamp: new Date().toISOString()
     };
+
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -106,18 +335,25 @@ export const StorageService = {
     downloadAnchorNode.remove();
   },
 
-  // Import full backup
-  importData: (file: File): Promise<boolean> => {
+  importData: async (file: File, scheduleOnly: boolean = false): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const json = JSON.parse(e.target?.result as string);
-          if (json.schedule) localStorage.setItem(KEYS.SCHEDULE, JSON.stringify(json.schedule));
-          if (json.taskDB) localStorage.setItem(KEYS.TASK_DB, JSON.stringify(json.taskDB));
-          if (json.assignments) localStorage.setItem(KEYS.ASSIGNMENTS, JSON.stringify(json.assignments));
-          if (json.team) localStorage.setItem(KEYS.TEAM, JSON.stringify(json.team));
-          if (json.pinnedMsg) localStorage.setItem(KEYS.PINNED_MSG, json.pinnedMsg);
+
+          if (scheduleOnly) {
+            // Only import schedule and assignments, preserve rules/team/settings
+            if (json.schedule) await StorageService.saveSchedule(json.schedule);
+            if (json.assignments) await StorageService.saveAssignments(json.assignments);
+          } else {
+            // Full import - everything
+            if (json.schedule) await StorageService.saveSchedule(json.schedule);
+            if (json.taskDB) await StorageService.saveTaskDB(json.taskDB);
+            if (json.assignments) await StorageService.saveAssignments(json.assignments);
+            if (json.team) await StorageService.saveTeam(json.team);
+            if (json.pinnedMsg) await StorageService.savePinnedMessage(json.pinnedMsg);
+          }
           resolve(true);
         } catch (error) {
           console.error("Import failed", error);

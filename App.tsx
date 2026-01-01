@@ -4,7 +4,7 @@ import {
   Download, Upload, Plus, Trash2, ArrowRight, X,
   Menu, RotateCcw, Save, AlertCircle, ScanLine, Loader2, Clock, Settings, UserPlus, Briefcase,
   Camera, Zap, Sparkles, MessageSquare, RefreshCw, Megaphone, Edit3, ArrowRightLeft, User, LayoutGrid, List,
-  Type, AlignLeft, ListOrdered, UserCheck, GripVertical, Eraser, MousePointerClick, Layers
+  Type, AlignLeft, ListOrdered, UserCheck, GripVertical, Eraser, MousePointerClick, Layers, LogOut
 } from 'lucide-react';
 
 import {
@@ -14,9 +14,11 @@ import {
 import { PRIORITY_PINNED_IDS, COMMON_SHIFTS } from './constants';
 import { StorageService } from './services/storageService';
 import { AIService } from './services/aiService';
+import { AuthService } from './services/authService';
 import TaskDBModal from './components/TaskDBModal';
 import { ScheduleTemplates } from './components/ScheduleTemplates';
 import { TouchScheduler } from './components/TouchScheduler';
+import { AuthModal } from './components/AuthModal';
 
 // --- Utility Functions ---
 
@@ -447,6 +449,8 @@ export default function App() {
   const [manualTaskInput, setManualTaskInput] = useState<{emp: string, text: string} | null>(null);
   const [moveTaskModal, setMoveTaskModal] = useState<{empName: string, task: AssignedTask} | null>(null);
   const [isEditingPinned, setIsEditingPinned] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Quick Shift Palette State
   const [selectedPaletteShift, setSelectedPaletteShift] = useState<string | null>(null);
@@ -472,10 +476,43 @@ export default function App() {
   const [huddleText, setHuddleText] = useState<string | null>(null);
   const [aiTasks, setAiTasks] = useState<TaskRule[] | null>(null);
 
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   const scanInputRef = useRef<HTMLInputElement>(null);
   const workAreaInputRef = useRef<HTMLInputElement>(null);
 
+  // Check auth status on mount
   useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const session = await AuthService.getSession();
+        setIsAuthenticated(!!session);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = AuthService.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  // Load data only when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
     const loadData = async () => {
         setIsLoading(true);
         try {
@@ -498,7 +535,7 @@ export default function App() {
         }
     };
     loadData();
-  }, []);
+  }, [isAuthenticated]);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -669,8 +706,20 @@ export default function App() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       if(e.target.files?.[0]) {
-          await StorageService.importData(e.target.files[0]);
+          setImportFile(e.target.files[0]);
+          setShowImportModal(true);
+      }
+  };
+
+  const handleImportConfirm = async (scheduleOnly: boolean) => {
+      if (!importFile) return;
+      try {
+          await StorageService.importData(importFile, scheduleOnly);
+          setShowImportModal(false);
+          setImportFile(null);
           window.location.reload();
+      } catch (error: any) {
+          alert("Import failed: " + error.message);
       }
   };
 
@@ -883,6 +932,19 @@ export default function App() {
 
   const shiftOptions = COMMON_SHIFTS;
 
+  // Show auth modal if not authenticated
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-100">
+        <Loader2 size={48} className="animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthModal onAuthenticated={() => setIsAuthenticated(true)} />;
+  }
+
   return (
     <>
     <div id="app-root" className="flex flex-col h-screen bg-slate-100 font-sans text-slate-900">
@@ -909,6 +971,17 @@ export default function App() {
               <Upload size={20}/>
               <input type="file" className="hidden" onChange={handleFileUpload} accept=".json"/>
            </label>
+           <button
+              onClick={async () => {
+                if (confirm('Are you sure you want to sign out?')) {
+                  await AuthService.signOut();
+                  setIsAuthenticated(false);
+                }
+              }}
+              title="Sign Out"
+              className="text-slate-400 hover:text-white">
+              <LogOut size={20}/>
+           </button>
         </div>
       </nav>
 
@@ -1444,6 +1517,53 @@ export default function App() {
                     <button onClick={() => setShowAutoAssignConfirm(false)} className="flex-1 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg">Cancel</button>
                     <button onClick={runAutoDistribute} className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-lg">Distribute</button>
                 </div>
+            </div>
+        </div>
+      )}
+
+      {/* Import Data Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold">Import Data</h3>
+                    <button onClick={() => {setShowImportModal(false); setImportFile(null);}} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
+                </div>
+                <p className="text-slate-600 text-sm mb-6">
+                    What would you like to import from <span className="font-mono text-indigo-600">{importFile?.name}</span>?
+                </p>
+                <div className="space-y-3">
+                    <button
+                        onClick={() => handleImportConfirm(true)}
+                        className="w-full p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl hover:border-green-400 transition-all group"
+                    >
+                        <div className="flex items-start gap-3">
+                            <Calendar size={24} className="text-green-600 flex-shrink-0 mt-0.5"/>
+                            <div className="text-left">
+                                <div className="font-bold text-green-800 mb-1">Schedule Only</div>
+                                <div className="text-xs text-green-700">Import weekly schedule and task assignments. Keeps your current task rules, team database, and settings.</div>
+                            </div>
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => handleImportConfirm(false)}
+                        className="w-full p-4 bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-300 rounded-xl hover:border-indigo-400 transition-all group"
+                    >
+                        <div className="flex items-start gap-3">
+                            <Download size={24} className="text-indigo-600 flex-shrink-0 mt-0.5"/>
+                            <div className="text-left">
+                                <div className="font-bold text-indigo-800 mb-1">Full Backup</div>
+                                <div className="text-xs text-indigo-700">Import everything: schedule, tasks, assignments, team database, and all settings. Completely replaces current data.</div>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                <button
+                    onClick={() => {setShowImportModal(false); setImportFile(null);}}
+                    className="w-full mt-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                    Cancel
+                </button>
             </div>
         </div>
       )}
