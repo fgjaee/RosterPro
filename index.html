@@ -14,22 +14,45 @@
     <style>
       body { font-family: 'Inter', sans-serif; }
       @media print {
-        @page { margin: 0.5cm; size: landscape; }
-        body { -webkit-print-color-adjust: exact; }
+        @page {
+          margin: 0.3cm;
+          size: portrait;
+        }
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
         .no-print { display: none !important; }
-        
+
         /* Explicitly hide the interactive app root during print */
         #app-root { display: none !important; }
-        
+
         /* Explicitly show the print root during print */
-        #print-root { display: block !important; }
-        
+        #print-root {
+          display: block !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+
         /* Reset containers */
-        html, body { 
-          height: auto !important; 
-          overflow: visible !important; 
+        html, body {
+          height: 100vh !important;
+          overflow: visible !important;
           width: 100% !important;
           background: white !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        /* Auto-scale content to fit one page */
+        #print-root > div {
+          transform-origin: top left;
+          width: 100%;
+        }
+
+        /* Calculate scale dynamically - will be set via inline style */
+        @page {
+          margin: 0.3cm;
         }
       }
       /* Hide print root on screen */

@@ -250,30 +250,30 @@ const PrintableRoster = ({
     }[settings.fontStyle] || 'font-sans';
 
     return (
-        <div className={`p-8 bg-white text-slate-900 w-full h-full ${fontClass}`}>
-            <div className="mb-6 border-b-2 border-slate-900 pb-4 flex justify-between items-start">
+        <div className={`p-4 bg-white text-slate-900 w-full h-full ${fontClass}`}>
+            <div className="mb-3 border-b-2 border-slate-900 pb-2 flex justify-between items-start">
                 <div>
-                    <h1 className="text-3xl font-black uppercase tracking-tight">{settings.pageTitle}</h1>
-                    <div className="font-bold text-slate-600 uppercase mt-1">{settings.dayLabel}</div>
+                    <h1 className="text-2xl font-black uppercase tracking-tight">{settings.pageTitle}</h1>
+                    <div className="font-bold text-slate-600 uppercase text-sm">{settings.dayLabel}</div>
                 </div>
                 {pinnedMessage && (
-                    <div className="max-w-md text-right bg-amber-50 p-3 rounded-lg border border-amber-200">
-                        <div className="text-[10px] font-bold text-amber-700 uppercase mb-1">{settings.announcementTitle}</div>
+                    <div className="max-w-md text-right bg-amber-50 p-2 rounded-lg border border-amber-200">
+                        <div className="text-[9px] font-bold text-amber-700 uppercase mb-0.5">{settings.announcementTitle}</div>
                         {settings.announcementFormat === 'list' ? (
-                            <ul className="text-sm font-medium text-slate-800 list-disc list-inside text-left">
+                            <ul className="text-xs font-medium text-slate-800 list-disc list-inside text-left">
                                 {pinnedMessage.split('\n').filter(l => l.trim()).map((line, i) => (
                                     <li key={i}>{line}</li>
                                 ))}
                             </ul>
                         ) : (
-                            <div className="text-sm font-medium text-slate-800 whitespace-pre-wrap">{pinnedMessage}</div>
+                            <div className="text-xs font-medium text-slate-800 whitespace-pre-wrap">{pinnedMessage}</div>
                         )}
                     </div>
                 )}
             </div>
 
             {settings.layout === 'grid' ? (
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-3 gap-3">
                     {/* Everybody Card for Print */}
                     {(() => {
                         const allStaffTasks = taskDB.filter(t => {
@@ -285,12 +285,12 @@ const PrintableRoster = ({
                         if (allStaffTasks.length === 0) return null;
 
                         return (
-                            <div className="border-2 border-green-600 rounded-lg break-inside-avoid col-span-2 mb-4">
-                                <div className="bg-green-100 p-2 border-b-2 border-green-600 flex justify-between items-center">
+                            <div className="border-2 border-green-600 rounded-lg break-inside-avoid col-span-3 mb-2">
+                                <div className="bg-green-100 p-1.5 border-b-2 border-green-600 flex justify-between items-center">
                                     <span className={`${headerClass} font-bold text-green-900`}>✓ EVERYBODY - Universal Tasks</span>
                                 </div>
-                                <div className="p-3">
-                                    <div className="grid grid-cols-2 gap-4">
+                                <div className="p-2">
+                                    <div className="grid grid-cols-3 gap-2">
                                         {allStaffTasks.sort((a,b) => getTaskSortPriority(a as AssignedTask) - getTaskSortPriority(b as AssignedTask)).map((task) => (
                                             <div key={task.id} className="border border-green-300 rounded p-2 bg-green-50">
                                                 <div className={`font-bold text-green-900 mb-2 ${fontSizeClass}`}>
@@ -357,12 +357,12 @@ const PrintableRoster = ({
                     if (allStaffTasks.length === 0) return null;
 
                     return (
-                        <div className="border-2 border-green-600 rounded-lg mb-6 overflow-hidden">
-                            <div className="bg-green-100 p-2 border-b-2 border-green-600">
+                        <div className="border-2 border-green-600 rounded-lg mb-3 overflow-hidden">
+                            <div className="bg-green-100 p-1.5 border-b-2 border-green-600">
                                 <span className={`${headerClass} font-bold text-green-900`}>✓ EVERYBODY - Universal Tasks</span>
                             </div>
-                            <div className="p-3 bg-green-50">
-                                <div className="grid grid-cols-2 gap-4">
+                            <div className="p-2 bg-green-50">
+                                <div className="grid grid-cols-3 gap-2">
                                     {allStaffTasks.sort((a,b) => getTaskSortPriority(a as AssignedTask) - getTaskSortPriority(b as AssignedTask)).map((task) => (
                                         <div key={task.id} className="border border-green-300 rounded p-2 bg-white">
                                             <div className={`font-bold text-green-900 mb-2 ${fontSizeClass}`}>
@@ -561,6 +561,35 @@ export default function App() {
 
   const executePrint = () => {
       setTimeout(() => {
+          // Auto-scale print content to fit on one page
+          const printRoot = document.getElementById('print-root');
+          const printContent = printRoot?.querySelector('div');
+
+          if (printContent) {
+              // Get the content dimensions
+              const contentHeight = printContent.scrollHeight;
+              const contentWidth = printContent.scrollWidth;
+
+              // Page dimensions (A4 in pixels at 96dpi, minus margins)
+              // Portrait: 210mm x 297mm = ~794px x ~1123px
+              // Minus margins (0.3cm = ~11.34px on each side)
+              const pageWidth = 794 - (11.34 * 2);
+              const pageHeight = 1123 - (11.34 * 2);
+
+              // Calculate scale factors
+              const scaleX = pageWidth / contentWidth;
+              const scaleY = pageHeight / contentHeight;
+              const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
+
+              // Apply scale if needed
+              if (scale < 1) {
+                  printContent.style.transform = `scale(${scale})`;
+                  printContent.style.transformOrigin = 'top left';
+              } else {
+                  printContent.style.transform = 'none';
+              }
+          }
+
           window.print();
       }, 100);
   };
