@@ -185,7 +185,7 @@ export const AIService = {
 
       try {
           const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
+              model: "gemini-2.0-flash-exp",
               contents: { parts: [{ text: prompt }] },
           });
           return response.text || "Let's have a great shift team!";

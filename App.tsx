@@ -1401,8 +1401,8 @@ export default function App() {
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">OCR Aliases (comma-separated)</label>
                                     <input
                                         className="text-xs text-slate-600 bg-slate-50 border border-slate-200 w-full mt-1 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1"
-                                        value={(member.aliases || []).join(', ')}
-                                        onChange={e => setTeam(team.map(t => t.id === member.id ? {
+                                        defaultValue={(member.aliases || []).join(', ')}
+                                        onBlur={e => setTeam(team.map(t => t.id === member.id ? {
                                             ...t,
                                             aliases: e.target.value.split(',').map(a => a.trim()).filter(a => a.length > 0)
                                         } : t))}
@@ -1567,6 +1567,43 @@ export default function App() {
                     Cancel
                 </button>
             </div>
+        </div>
+      )}
+
+      {/* Huddle Modal */}
+      {huddleText && (
+        <div className="fixed inset-0 bg-black/50 z-[90] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <Zap size={24} className="text-amber-600"/>
+                <h3 className="text-xl font-bold text-slate-800">Daily Huddle</h3>
+              </div>
+              <button onClick={() => setHuddleText(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={24}/>
+              </button>
+            </div>
+            <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-lg">
+              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{huddleText}</p>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(huddleText);
+                  alert('Copied to clipboard!');
+                }}
+                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors"
+              >
+                Copy Text
+              </button>
+              <button
+                onClick={() => setHuddleText(null)}
+                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
