@@ -850,8 +850,21 @@ export default function App() {
 
         const pool = validRules.filter(t => (t.type === 'general' || t.type === 'shift_based'));
         pool.forEach(t => {
-            const best = staff.filter(s => isStaffCompatibleWithTask(s.compStart, s.compEnd, t))
-                              .sort((a,b) => getWorkerLoad(a.name, newAssignments) - getWorkerLoad(b.name, newAssignments))[0];
+            // Stocking tasks (T-tasks) should only be assigned to James (team leader)
+            if (t.code.startsWith('T') && t.code !== 'TRCK') {
+                const james = staff.find(s => namesMatch(s.name, 'James'));
+                if (james && isStaffCompatibleWithTask(james.compStart, james.compEnd, t)) {
+                    assign(james.name, t);
+                    return;
+                }
+            }
+
+            // All other tasks distributed to team (excluding James for stocking tasks)
+            const eligibleStaff = t.code.startsWith('T') && t.code !== 'TRCK'
+                ? staff.filter(s => !namesMatch(s.name, 'James') && isStaffCompatibleWithTask(s.compStart, s.compEnd, t))
+                : staff.filter(s => isStaffCompatibleWithTask(s.compStart, s.compEnd, t));
+
+            const best = eligibleStaff.sort((a,b) => getWorkerLoad(a.name, newAssignments) - getWorkerLoad(b.name, newAssignments))[0];
             if(best) assign(best.name, t);
         });
 
@@ -1003,6 +1016,11 @@ export default function App() {
   };
 
   const handleDragLeave = () => {
+      setDropTarget(null);
+  };
+
+  const handleDragEnd = () => {
+      setDraggedTask(null);
       setDropTarget(null);
   };
 
@@ -1464,6 +1482,7 @@ export default function App() {
                                                         key={t.instanceId}
                                                         draggable
                                                         onDragStart={() => handleDragStart(t, staff.name)}
+                                                        onDragEnd={handleDragEnd}
                                                         className={`group flex items-start p-2 rounded border transition-all cursor-move ${
                                                             isDragging ? 'opacity-50 scale-95' :
                                                             isCompleted ? 'bg-green-50 border-green-200' :
