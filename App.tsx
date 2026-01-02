@@ -1138,17 +1138,17 @@ export default function App() {
       }
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
+  const handleRowDragStart = (e: React.DragEvent, index: number) => {
     setDraggedRowIndex(index);
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleRowDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+  const handleRowDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     if (draggedRowIndex === null || !schedule) return;
 
@@ -1648,9 +1648,9 @@ export default function App() {
                                             key={shift.id}
                                             className={`group hover:bg-slate-50/50 break-inside-avoid ${draggedRowIndex === idx ? 'opacity-50' : ''}`}
                                             draggable
-                                            onDragStart={(e) => handleDragStart(e, idx)}
-                                            onDragOver={(e) => handleDragOver(e, idx)}
-                                            onDrop={(e) => handleDrop(e, idx)}
+                                            onDragStart={(e) => handleRowDragStart(e, idx)}
+                                            onDragOver={(e) => handleRowDragOver(e, idx)}
+                                            onDrop={(e) => handleRowDrop(e, idx)}
                                         >
                                             <td className="p-4 text-slate-300 cursor-move hover:text-slate-500"><GripVertical size={16}/></td>
                                             <td className="p-4 font-medium text-slate-800">
