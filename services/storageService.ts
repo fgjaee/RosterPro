@@ -1,4 +1,4 @@
-import { ScheduleData, TaskRule, TaskAssignmentMap, Employee } from "../types";
+import { ScheduleData, TaskRule, TaskAssignmentMap, Employee, CalendarEvent } from "../types";
 import { DEFAULT_TASK_DB, DEFAULT_TEAM } from "../constants";
 import { supabase, TABLES } from './supabaseClient';
 
@@ -309,6 +309,91 @@ export const StorageService = {
     }
   },
 
+  // --- Calendar Events Management ---
+  getCalendarEvents: async (): Promise<CalendarEvent[]> => {
+    try {
+      const userId = await getUserId();
+      const { data, error } = await supabase
+        .from(TABLES.CALENDAR_EVENTS)
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: true });
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      return data?.map(item => item.event_data as CalendarEvent) || [];
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+      return [];
+    }
+  },
+
+  saveCalendarEvent: async (event: CalendarEvent): Promise<void> => {
+    try {
+      const userId = await getUserId();
+
+      // Check if event already exists
+      const { data: existing } = await supabase
+        .from(TABLES.CALENDAR_EVENTS)
+        .select('id')
+        .eq('user_id', userId)
+        .eq('event_data->>id', event.id)
+        .single();
+
+      const eventData = {
+        ...event,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (existing) {
+        // Update existing event
+        const { error } = await supabase
+          .from(TABLES.CALENDAR_EVENTS)
+          .update({
+            event_data: eventData,
+            date: event.date,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new event
+        const { error } = await supabase
+          .from(TABLES.CALENDAR_EVENTS)
+          .insert({
+            user_id: userId,
+            event_data: {
+              ...eventData,
+              createdAt: new Date().toISOString()
+            },
+            date: event.date
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving calendar event:', error);
+      throw error;
+    }
+  },
+
+  deleteCalendarEvent: async (eventId: string): Promise<void> => {
+    try {
+      const userId = await getUserId();
+      const { error } = await supabase
+        .from(TABLES.CALENDAR_EVENTS)
+        .delete()
+        .eq('user_id', userId)
+        .eq('event_data->>id', eventId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting calendar event:', error);
+      throw error;
+    }
+  },
+
   // --- Export / Import ---
   exportData: async () => {
     const schedule = await StorageService.getSchedule();
@@ -316,6 +401,7 @@ export const StorageService = {
     const assignments = await StorageService.getAssignments();
     const team = await StorageService.getTeam();
     const pinnedMsg = await StorageService.getPinnedMessage();
+    const calendarEvents = await StorageService.getCalendarEvents();
 
     const exportObj = {
       schedule,
@@ -323,6 +409,7 @@ export const StorageService = {
       assignments,
       team,
       pinnedMsg,
+      calendarEvents,
       timestamp: new Date().toISOString()
     };
 
@@ -353,6 +440,11 @@ export const StorageService = {
             if (json.assignments) await StorageService.saveAssignments(json.assignments);
             if (json.team) await StorageService.saveTeam(json.team);
             if (json.pinnedMsg) await StorageService.savePinnedMessage(json.pinnedMsg);
+            if (json.calendarEvents && Array.isArray(json.calendarEvents)) {
+              for (const event of json.calendarEvents) {
+                await StorageService.saveCalendarEvent(event);
+              }
+            }
           }
           resolve(true);
         } catch (error) {

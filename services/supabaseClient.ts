@@ -19,5 +19,6 @@ export const TABLES = {
   TASK_DB: 'task_rules',
   ASSIGNMENTS: 'task_assignments',
   TEAM: 'team_members',
-  SETTINGS: 'user_settings'
+  SETTINGS: 'user_settings',
+  CALENDAR_EVENTS: 'calendar_events'
 };

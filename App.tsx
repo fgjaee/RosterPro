@@ -9,7 +9,7 @@ import {
 
 import {
   ScheduleData, TaskRule, TaskAssignmentMap,
-  DayKey, Shift, AssignedTask, DAY_LABELS, Employee
+  DayKey, Shift, AssignedTask, DAY_LABELS, Employee, CalendarEvent
 } from './types';
 import { PRIORITY_PINNED_IDS, COMMON_SHIFTS } from './constants';
 import { StorageService } from './services/storageService';
@@ -20,6 +20,7 @@ import { ScheduleTemplates } from './components/ScheduleTemplates';
 import { TouchScheduler } from './components/TouchScheduler';
 import { VisualShiftEditor } from './components/VisualShiftEditor';
 import { AuthModal } from './components/AuthModal';
+import { Calendar as CalendarView } from './components/Calendar';
 
 // --- Utility Functions ---
 
@@ -445,7 +446,7 @@ const PrintableRoster = ({
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'schedule' | 'tasks' | 'team'>('tasks');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'tasks' | 'team' | 'calendar'>('tasks');
   const [selectedDay, setSelectedDay] = useState<DayKey>('fri');
   const [scheduleViewMode, setScheduleViewMode] = useState<'grid' | 'touch' | 'visual'>('visual');
 
@@ -454,6 +455,7 @@ export default function App() {
   const [assignments, setAssignments] = useState<TaskAssignmentMap>({});
   const [team, setTeam] = useState<Employee[]>([]);
   const [pinnedMessage, setPinnedMessage] = useState("");
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -541,18 +543,20 @@ export default function App() {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [s, t, a, tm, pm] = await Promise.all([
+            const [s, t, a, tm, pm, ce] = await Promise.all([
                 StorageService.getSchedule(),
                 StorageService.getTaskDB(),
                 StorageService.getAssignments(),
                 StorageService.getTeam(),
-                StorageService.getPinnedMessage()
+                StorageService.getPinnedMessage(),
+                StorageService.getCalendarEvents()
             ]);
             setSchedule(s);
             setTaskDB(t);
             setAssignments(a);
             setTeam(tm);
             setPinnedMessage(pm);
+            setCalendarEvents(ce);
         } catch (e) {
             console.error("Failed to load data", e);
         } finally {
@@ -1217,6 +1221,7 @@ export default function App() {
            <div className="flex bg-slate-800 rounded-lg p-1">
              <button onClick={()=>setActiveTab('tasks')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab==='tasks'?'bg-slate-700 text-white shadow':'text-slate-400 hover:text-white'}`}>Worklists</button>
              <button onClick={()=>setActiveTab('schedule')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab==='schedule'?'bg-slate-700 text-white shadow':'text-slate-400 hover:text-white'}`}>Schedule</button>
+             <button onClick={()=>setActiveTab('calendar')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab==='calendar'?'bg-slate-700 text-white shadow':'text-slate-400 hover:text-white'}`}>Calendar</button>
              <button onClick={()=>setActiveTab('team')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab==='team'?'bg-slate-700 text-white shadow':'text-slate-400 hover:text-white'}`}>Team</button>
            </div>
            <div className="h-6 w-px bg-slate-700 mx-2"></div>
@@ -1751,6 +1756,24 @@ export default function App() {
                     </>
                 )}
             </div>
+        )}
+
+        {activeTab === 'calendar' && (
+            <CalendarView
+                events={calendarEvents}
+                onAddEvent={async (event) => {
+                    setCalendarEvents([...calendarEvents, event]);
+                    await StorageService.saveCalendarEvent(event);
+                }}
+                onUpdateEvent={async (event) => {
+                    setCalendarEvents(calendarEvents.map(e => e.id === event.id ? event : e));
+                    await StorageService.saveCalendarEvent(event);
+                }}
+                onDeleteEvent={async (eventId) => {
+                    setCalendarEvents(calendarEvents.filter(e => e.id !== eventId));
+                    await StorageService.deleteCalendarEvent(eventId);
+                }}
+            />
         )}
 
         {activeTab === 'team' && (
