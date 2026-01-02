@@ -849,24 +849,28 @@ export default function App() {
         });
 
         const pool = validRules.filter(t => (t.type === 'general' || t.type === 'shift_based'));
+
+        // Determine if we're short-staffed (4 or fewer staff = James helps with all tasks)
+        const isShortStaffed = staff.length <= 4;
+
         pool.forEach(t => {
-            // James (team leader) should NOT get T-tasks, W-tasks, or DRY tasks unless short-staffed
-            const isAdminExcluded = t.code.startsWith('T') || t.code.startsWith('W') || t.code === 'DRY';
+            // T-tasks, W-tasks, or DRY tasks
+            const isOperationalTask = t.code.startsWith('T') || t.code.startsWith('W') || t.code === 'DRY';
 
-            // Try to assign to team first (excluding James for admin-excluded tasks)
-            let eligibleStaff = staff.filter(s =>
-                isStaffCompatibleWithTask(s.compStart, s.compEnd, t) &&
-                !(isAdminExcluded && namesMatch(s.name, 'James'))
-            );
+            let eligibleStaff;
 
-            let best = eligibleStaff.sort((a,b) => getWorkerLoad(a.name, newAssignments) - getWorkerLoad(b.name, newAssignments))[0];
-
-            // If no one else available and it's an admin-excluded task, allow James as fallback (short-staffed)
-            if (!best && isAdminExcluded) {
-                const james = staff.find(s => namesMatch(s.name, 'James') && isStaffCompatibleWithTask(s.compStart, s.compEnd, t));
-                if (james) best = james;
+            if (isOperationalTask && !isShortStaffed) {
+                // Plenty of staff (5+): Exclude James from operational tasks
+                eligibleStaff = staff.filter(s =>
+                    isStaffCompatibleWithTask(s.compStart, s.compEnd, t) &&
+                    !namesMatch(s.name, 'James')
+                );
+            } else {
+                // Short-staffed (4 or fewer) OR non-operational task: Include everyone
+                eligibleStaff = staff.filter(s => isStaffCompatibleWithTask(s.compStart, s.compEnd, t));
             }
 
+            const best = eligibleStaff.sort((a,b) => getWorkerLoad(a.name, newAssignments) - getWorkerLoad(b.name, newAssignments))[0];
             if(best) assign(best.name, t);
         });
 
