@@ -1592,6 +1592,31 @@ export default function App() {
                     </div>
                 </div>
 
+                {/* Schedule Actions & Week Period - Available in ALL view modes */}
+                <div className="w-full max-w-6xl mb-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-center flex-wrap gap-4">
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-bold text-slate-600">Week Period:</label>
+                            <input
+                                type="text"
+                                value={schedule.week_period}
+                                onChange={(e) => setSchedule({...schedule, week_period: e.target.value})}
+                                placeholder="e.g., 12/07 - 12/13"
+                                className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <input type="file" ref={scanInputRef} className="hidden" onChange={handleScanFileChange} accept="image/*,application/pdf" />
+                            <button onClick={handlePopulateScheduleFromTeam} className="flex items-center gap-2 bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-colors">
+                                <UserCheck size={16}/> Populate from Team
+                            </button>
+                            <button onClick={() => scanInputRef.current?.click()} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-md transition-colors">
+                                <ScanLine size={16}/> Scan Schedule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 {scheduleViewMode === 'visual' ? (
                     /* Visual Shift Editor - NEW */
                     <div className="w-full max-w-6xl max-h-[calc(100vh-300px)]">
@@ -1630,11 +1655,6 @@ export default function App() {
                         <div className="p-6 border-b border-slate-200 flex justify-between items-center no-print flex-wrap gap-4">
                             <h2 className="text-xl font-bold text-slate-800">Staff Schedule</h2>
                             <div className="flex gap-2">
-                                 <input type="file" ref={scanInputRef} className="hidden" onChange={handleScanFileChange} accept="image/*,application/pdf" />
-                                 <button onClick={handlePopulateScheduleFromTeam} className="flex items-center gap-2 bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-colors">
-                                    <UserCheck size={16}/> Populate from Team
-                                 </button>
-                                 <button onClick={() => scanInputRef.current?.click()} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 shadow-md transition-colors"><ScanLine size={16}/> Scan Schedule</button>
                                  <button onClick={handleOpenPrintModal} className="flex items-center gap-2 px-4 py-2 text-slate-600 font-bold text-sm bg-white border border-slate-200 hover:bg-slate-50 rounded-lg"><Printer size={16}/> Print</button>
                             </div>
                         </div>
